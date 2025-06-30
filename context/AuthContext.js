@@ -38,12 +38,13 @@ export function AuthProvider({ children }) {
   };
 
   // Login
-  const login = async (email, password) => {
-    const res = await apiLogin({ email, password });
-    setToken(res.data.access_token);
-    localStorage.setItem("token", res.data.access_token);
-    setUser(res.data.user);
-  };
+ const login = async (email, password) => {
+  const res = await apiLogin({ email, password });
+  setToken(res.data.access_token);
+  localStorage.setItem("token", res.data.access_token);
+  setUser(res.data.user);
+  return res.data; // ✅ THIS LINE FIXES IT
+};
 
   // Logout
   const logout = async () => {
