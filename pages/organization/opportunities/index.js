@@ -1,69 +1,100 @@
-// pages/organization/opportunities/index.js
 import React, { useEffect, useState } from "react";
-import OrgLayout from "../../../components/OrgLayout";
+import axios from "axios";
+import { useAuth } from "../../../context/AuthContext";
+import Link from "next/link";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export default function OpportunitiesIndex() {
-  const [opportunities, setOpportunities] = useState([
-    {
-      id: 1,
-      title: "Community Clean-Up Drive",
-      description: "Help clean up local parks and public spaces in Mzuzu.",
-      location: "Mzuzu",
-      start_date: "2025-05-20",
-      end_date: "2025-05-25",
-      volunteers_needed: 10,
-      required_skills: ["Leadership", "Communication"]
-    },
-    {
-      id: 2,
-      title: "Teach Kids to Code",
-      description: "Support children in learning basic programming skills.",
-      location: "Lilongwe",
-      start_date: "2025-06-01",
-      end_date: "2025-06-30",
-      volunteers_needed: 5,
-      required_skills: ["Teaching", "Programming"]
-    }
-  ]);
+  const { token } = useAuth();
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    if (!token) return;
+    setLoading(true);
+    setApiError("");
+    axios
+      .get(`${API_BASE}/opportunities`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+        setOpportunities(res.data.data || res.data || []);
+      })
+      .catch((e) => {
+        console.error("Failed to load opportunities:", e);
+        console.error("Error details:", {
+          status: e.response?.status,
+          statusText: e.response?.statusText,
+          data: e.response?.data,
+          message: e.message
+        });
+
+        if (e.response?.status === 401) {
+          setApiError("Authentication failed - please log in again");
+        } else if (e.response?.status === 403) {
+          setApiError("Access denied - insufficient permissions");
+        } else if (e.response?.status === 500) {
+          setApiError("Server error - please try again later");
+        } else if (!e.response) {
+          setApiError("Network error - please check your connection");
+        } else {
+          setApiError("Failed to load opportunities. Please try again.");
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [token]);
 
   return (
-    <OrgLayout>
-      <div className="p-6">
+    <div>
         <h1 className="text-2xl font-bold mb-6">Posted Opportunities</h1>
 
         {/* Add New Button */}
         <div className="flex justify-end mb-4">
-          <a
+          <Link
             href="/organization/opportunities/create"
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded"
           >
             + New Opportunity
-          </a>
+          </Link>
         </div>
 
-        {/* Opportunities Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {opportunities.map((opp) => (
-            <div key={opp.id} className="bg-white shadow-md rounded-lg p-4 border-l-4 border-indigo-500 hover:shadow-lg transition">
-              <h3 className="font-semibold text-lg">{opp.title}</h3>
-              <p className="text-sm text-gray-600 mt-2 line-clamp-2">{opp.description}</p>
-              <p className="text-xs text-gray-500 mt-2">📍 Location: {opp.location}</p>
-              <p className="text-xs text-gray-500 mt-1">📅 Starts: {new Date(opp.start_date).toLocaleDateString()}</p>
-              <p className="text-xs text-gray-500 mt-1">👥 Needed: {opp.volunteers_needed} volunteers</p>
-              <p className="mt-2 text-xs">
-                {opp.required_skills.map((skill, i) => (
-                  <span key={i} className="inline-block bg-gray-200 rounded-full px-2 py-1 mr-2">
-                    {skill}
-                  </span>
-                ))}
-              </p>
-              <a href={`/organization/opportunities/${opp.id}`} className="text-indigo-600 text-sm hover:underline mt-4 inline-block">
-                View Details →
-              </a>
-            </div>
-          ))}
-        </div>
-      </div>
-    </OrgLayout>
+        {loading ? (
+          <div className="text-indigo-700 font-semibold">Loading opportunities…</div>
+        ) : apiError ? (
+          <div className="text-red-600 font-semibold">{apiError}</div>
+        ) : opportunities.length === 0 ? (
+          <div className="text-gray-500">No opportunities posted yet.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {opportunities.map((opp) => (
+              <div key={opp.id} className="bg-white shadow-md rounded-lg p-4 border-l-4 border-indigo-500 hover:shadow-lg transition">
+                <h3 className="font-semibold text-lg">{opp.title}</h3>
+                <p className="text-sm text-gray-600 mt-2 line-clamp-2">{opp.description}</p>
+                <p className="text-xs text-gray-500 mt-2">📍 Location: {opp.location}</p>
+                <p className="text-xs text-gray-500 mt-1">📅 Starts: {opp.start_date ? new Date(opp.start_date).toLocaleDateString() : "N/A"}</p>
+                {opp.end_date && (
+                  <p className="text-xs text-gray-500 mt-1">🏁 Ends: {new Date(opp.end_date).toLocaleDateString()}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">👥 Needed: {opp.volunteers_needed} volunteers</p>
+                <p className="mt-2 text-xs">
+                  {(opp.required_skills || []).map((skill, i) => (
+                    <span key={i} className="inline-block bg-gray-200 rounded-full px-2 py-1 mr-2">
+                      {skill}
+                    </span>
+                  ))}
+                </p>
+                <Link
+                  href={`/organization/opportunities/${opp.id}`}
+                  className="text-indigo-600 text-sm hover:underline mt-4 inline-block"
+                >
+                  View Details →
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+    </div>
   );
 }

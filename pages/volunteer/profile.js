@@ -1,11 +1,15 @@
-// pages/volunteer/profile.js
-
 import { useEffect, useState } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useAuth } from "../../context/AuthContext";
-import Sidebar from "../../components/Sidebar";
-import { getProfile, saveProfile } from "../../lib/api";
+import axios from "axios";
+import {
+  UserCircleIcon,
+  MapPinIcon,
+  ClockIcon,
+  DocumentTextIcon,
+  CheckCircleIcon
+} from "@heroicons/react/24/outline";
 
 // region→district mapping
 const regionDistricts = {
@@ -34,6 +38,8 @@ const regionDistricts = {
     "Neno",
   ],
 };
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export default function ProfilePage() {
   const { user, token, loading: authLoading } = useAuth();
@@ -74,15 +80,21 @@ export default function ProfilePage() {
     }
   }, [authLoading, user, router]);
 
-  // Load profile
+  // Load profile from backend
   useEffect(() => {
     if (authLoading) return;
     if (!user) return router.push("/login");
+    if (!token) return;
 
-    getProfile(token)
+    setLoading(true);
+    setError("");
+    axios
+      .get(`${API_BASE}/volunteer/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       .then((res) => {
         setProfile(res.data);
-        setCompletion(res.data.completion || 0);
+        setCompletion(res.data.completion || calculateCompletion(res.data));
       })
       .catch((err) => {
         if (err.response?.status === 404) {
@@ -105,11 +117,16 @@ export default function ProfilePage() {
   const handleChange = (field) => (e) =>
     setProfile((p) => ({ ...p, [field]: e.target.value }));
 
+  // Save profile to backend
   const handleSave = async () => {
     setSaving(true);
     setError("");
     try {
-      const res = await saveProfile(profile, token);
+      const res = await axios.post(
+        `${API_BASE}/volunteer/profile`,
+        profile,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setProfile(res.data.profile);
 
       const filled = ["bio", "location", "region", "district", "availability"]
@@ -123,6 +140,13 @@ export default function ProfilePage() {
       setSaving(false);
     }
   };
+
+  function calculateCompletion(data) {
+    if (!data) return 0;
+    const fields = ["bio", "location", "region", "district", "availability"];
+    const filled = fields.filter((f) => data[f]).length;
+    return Math.round((filled / fields.length) * 100);
+  }
 
   if (authLoading || loading) {
     return (
@@ -139,54 +163,75 @@ export default function ProfilePage() {
         <meta name="description" content="Edit your volunteer profile." />
       </Head>
 
-      <div className="flex min-h-screen bg-gradient-to-r from-blue-50 to-blue-100">
-        <Sidebar active="profile" />
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex items-center space-x-3">
+          <UserCircleIcon className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-green-700">My Volunteer Profile</h1>
+            <p className="text-gray-600 text-sm sm:text-base">Manage your volunteer information and preferences</p>
+          </div>
+        </div>
 
-        <main className="flex-1 p-6 md:p-10 max-w-4xl mx-auto w-full">
-          <h1 className="text-3xl font-bold mb-2 text-blue-700">
-            My Volunteer Profile
-          </h1>
-          <p className="text-sm text-blue-900 mb-6">
-            Profile completeness: <strong>{completion}%</strong>
-          </p>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>
+        {/* Profile Completion */}
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm sm:text-base font-medium text-gray-700">Profile Completion</span>
+            <span className="text-sm sm:text-base font-bold text-green-600">{completion}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
+            <div
+              className="bg-green-600 h-2 sm:h-3 rounded-full transition-all duration-300"
+              style={{ width: `${completion}%` }}
+            ></div>
+          </div>
+          {completion < 100 && (
+            <p className="text-xs sm:text-sm text-gray-500 mt-2">
+              Complete your profile to get better opportunity matches
+            </p>
           )}
+        </div>
 
-          <div className="bg-white p-6 rounded-lg shadow border border-blue-200">
-            {/* Read-only user info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="block text-blue-900 font-medium mb-1">
-                  Name
-                </label>
-                <p className="bg-blue-50 p-2 rounded border border-blue-200 text-black">
-                  {user.name}
-                </p>
-              </div>
-              <div>
-                <label className="block text-blue-900 font-medium mb-1">
-                  Email
-                </label>
-                <p className="bg-blue-50 p-2 rounded border border-blue-200 text-black">
-                  {user.email}
-                </p>
-              </div>
-              <div>
-                <label className="block text-blue-900 font-medium mb-1">
-                  Role
-                </label>
-                <p className="bg-blue-50 p-2 rounded border border-blue-200 text-black">
-                  {Array.isArray(user.roles)
-                    ? user.roles.join(", ")
-                    : user.role}
-                </p>
-              </div>
+        {error && (
+          <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Profile Information</h2>
+
+          {/* Read-only user info */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
+            <div>
+              <label className="block text-gray-700 font-medium mb-1 text-sm sm:text-base">
+                Name
+              </label>
+              <p className="bg-white p-2 sm:p-3 rounded border border-gray-200 text-gray-800 text-sm sm:text-base break-words">
+                {user.name}
+              </p>
             </div>
+            <div>
+              <label className="block text-gray-700 font-medium mb-1 text-sm sm:text-base">
+                Email
+              </label>
+              <p className="bg-white p-2 sm:p-3 rounded border border-gray-200 text-gray-800 text-sm sm:text-base break-words">
+                {user.email}
+              </p>
+            </div>
+            <div className="lg:col-span-2">
+              <label className="block text-gray-700 font-medium mb-1 text-sm sm:text-base">
+                Role
+              </label>
+              <p className="bg-white p-2 sm:p-3 rounded border border-gray-200 text-gray-800 capitalize text-sm sm:text-base">
+                {Array.isArray(user.roles)
+                  ? user.roles.join(", ")
+                  : user.role || "volunteer"}
+              </p>
+            </div>
+          </div>
 
             {/* Editable profile fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <TextArea
                 label="Bio"
                 id="bio"
@@ -260,7 +305,6 @@ export default function ProfilePage() {
               {saving ? "Saving…" : "Save Changes"}
             </button>
           </div>
-        </main>
       </div>
     </>
   );
@@ -277,7 +321,7 @@ function Input({ label, id, name, value, onChange, disabled = false }) {
 
   return (
     <div>
-      <label htmlFor={id} className="block text-blue-900 font-medium mb-1">
+      <label htmlFor={id} className="block text-gray-700 font-medium mb-1 text-sm sm:text-base">
         {label}
       </label>
       <input
@@ -287,8 +331,8 @@ function Input({ label, id, name, value, onChange, disabled = false }) {
         value={value}
         onChange={handleChange}
         disabled={disabled}
-        className={`w-full border border-blue-300 rounded px-3 py-2 focus:ring-blue-500 focus:outline-none focus:border-blue-500 transition-colors text-black ${
-          isDirty ? "bg-blue-50" : "bg-white"
+        className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm sm:text-base focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-800 ${
+          isDirty ? "bg-green-50" : "bg-white"
         } ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}`}
       />
     </div>
@@ -306,7 +350,7 @@ function Select({ label, id, name, value, onChange, disabled = false, children }
 
   return (
     <div>
-      <label htmlFor={id} className="block text-blue-900 font-medium mb-1">
+      <label htmlFor={id} className="block text-gray-700 font-medium mb-1 text-sm sm:text-base">
         {label}
       </label>
       <select
@@ -315,8 +359,8 @@ function Select({ label, id, name, value, onChange, disabled = false, children }
         value={value}
         onChange={handleChange}
         disabled={disabled}
-        className={`w-full border border-blue-300 rounded px-3 py-2 focus:ring-blue-500 focus:outline-none focus:border-blue-500 transition-colors text-black ${
-          isDirty ? "bg-blue-50" : "bg-white"
+        className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm sm:text-base focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-800 ${
+          isDirty ? "bg-green-50" : "bg-white"
         } ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}`}
       >
         {children}
@@ -336,7 +380,7 @@ function TextArea({ label, id, name, value, onChange, rows = 4 }) {
 
   return (
     <div>
-      <label htmlFor={id} className="block text-blue-900 font-medium mb-1">
+      <label htmlFor={id} className="block text-gray-700 font-medium mb-1 text-sm sm:text-base">
         {label}
       </label>
       <textarea
@@ -345,8 +389,8 @@ function TextArea({ label, id, name, value, onChange, rows = 4 }) {
         rows={rows}
         value={value}
         onChange={handleChange}
-        className={`w-full border border-blue-300 rounded px-3 py-2 resize-none focus:ring-blue-500 focus:outline-none transition-colors text-black ${
-          isDirty ? "bg-blue-50" : "bg-white"
+        className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm sm:text-base resize-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-gray-800 ${
+          isDirty ? "bg-green-50" : "bg-white"
         }`}
       />
     </div>

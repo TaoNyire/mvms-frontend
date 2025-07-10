@@ -1,6 +1,5 @@
 // pages/organization/settings/index.js
 import React, { useState } from "react";
-import OrgLayout from "../../../components/OrgLayout";
 
 export default function OrgSettings() {
   const [form, setForm] = useState({
@@ -23,8 +22,7 @@ export default function OrgSettings() {
   };
 
   return (
-    <OrgLayout>
-      <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 max-w-3xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md space-y-6">
@@ -92,7 +90,6 @@ export default function OrgSettings() {
             </button>
           </div>
         </form>
-      </div>
-    </OrgLayout>
+    </div>
   );
 }

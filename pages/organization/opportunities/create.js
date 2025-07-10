@@ -1,7 +1,14 @@
 import React, { useState } from "react";
-import OrgLayout from "../../../components/OrgLayout";
+import axios from "axios";
+import { useAuth } from "../../../context/AuthContext";
+import { useRouter } from "next/router";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export default function CreateOpportunity() {
+  const { token } = useAuth();
+  const router = useRouter();
+
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -14,6 +21,7 @@ export default function CreateOpportunity() {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -42,22 +50,56 @@ export default function CreateOpportunity() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess(false);
+
+    // Basic validation
+    if (!form.title || !form.description || !form.location || !form.start_date || !form.volunteers_needed) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+    if (form.required_skills.some(skill => skill.trim() === "")) {
+      setError("Please fill in all required skills or remove empty skill fields.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Replace with real API call later
-      console.log("Submitting:", form);
-      alert("Opportunity created successfully!");
+      const payload = {
+        ...form,
+        required_skills: JSON.stringify(form.required_skills),
+      };
+      await axios.post(`${API_BASE}/opportunities/add`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      setSuccess(true);
+      setForm({
+        title: "",
+        description: "",
+        location: "",
+        start_date: "",
+        end_date: "",
+        volunteers_needed: "",
+        required_skills: [""],
+      });
+      setTimeout(() => {
+        router.push("/organization/opportunities");
+      }, 1200);
     } catch (err) {
-      setError(err.message || "Failed to create opportunity");
+      setError(
+        err?.response?.data?.message ||
+          "Failed to create opportunity. Please check your input and try again."
+      );
     }
 
     setLoading(false);
   };
 
   return (
-    <OrgLayout>
-      <div className="p-6 max-w-4xl mx-auto w-full bg-gradient-to-r from-blue-50 to-blue-100 min-h-screen">
+    <div className="p-6 max-w-4xl mx-auto w-full">
         <h1 className="text-3xl font-bold mb-2 text-blue-700">
           Post a New Opportunity
         </h1>
@@ -68,6 +110,11 @@ export default function CreateOpportunity() {
         {error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>
         )}
+        {success && (
+          <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
+            Opportunity created successfully! Redirecting...
+          </div>
+        )}
 
         <div className="bg-white p-6 rounded-lg shadow border border-blue-200">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -77,6 +124,7 @@ export default function CreateOpportunity() {
               name="title"
               value={form.title}
               onChange={handleChange}
+              required
             />
 
             {/* Description */}
@@ -86,6 +134,7 @@ export default function CreateOpportunity() {
               value={form.description}
               onChange={handleChange}
               isTextArea
+              required
             />
 
             {/* Location */}
@@ -95,6 +144,7 @@ export default function CreateOpportunity() {
               value={form.location}
               onChange={handleChange}
               placeholder="E.g., Mzuzu, Malawi"
+              required
             />
 
             {/* Dates */}
@@ -105,6 +155,7 @@ export default function CreateOpportunity() {
                 value={form.start_date}
                 onChange={handleChange}
                 type="date"
+                required
               />
               <FormField
                 label="End Date (Optional)"
@@ -123,6 +174,7 @@ export default function CreateOpportunity() {
               onChange={handleChange}
               type="number"
               min="1"
+              required
             />
 
             {/* Required Skills */}
@@ -143,6 +195,7 @@ export default function CreateOpportunity() {
                     type="button"
                     onClick={() => removeSkillInput(index)}
                     className="text-red-500 hover:text-red-700"
+                    disabled={form.required_skills.length === 1}
                   >
                     ✕
                   </button>
@@ -171,8 +224,7 @@ export default function CreateOpportunity() {
             </div>
           </form>
         </div>
-      </div>
-    </OrgLayout>
+    </div>
   );
 }
 
@@ -186,6 +238,7 @@ function FormField({
   placeholder = "",
   isTextArea = false,
   min,
+  required,
 }) {
   const [isDirty, setIsDirty] = useState(false);
 
@@ -198,6 +251,7 @@ function FormField({
     <div>
       <label htmlFor={name} className="block text-blue-900 font-medium mb-1">
         {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       {isTextArea ? (
         <textarea
@@ -209,6 +263,7 @@ function FormField({
           className={`w-full border border-blue-300 rounded px-3 py-2 resize-none focus:ring-blue-500 focus:outline-none transition-colors text-black ${
             isDirty ? "bg-blue-50" : "bg-white"
           }`}
+          required={required}
         />
       ) : (
         <input
@@ -222,6 +277,7 @@ function FormField({
           className={`w-full border border-blue-300 rounded px-3 py-2 focus:ring-blue-500 focus:outline-none transition-colors text-black ${
             isDirty ? "bg-blue-50" : "bg-white"
           }`}
+          required={required}
         />
       )}
     </div>

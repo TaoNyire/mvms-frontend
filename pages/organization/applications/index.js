@@ -1,59 +1,395 @@
-// pages/organization/applications/index.js
 import React, { useEffect, useState } from "react";
-import OrgLayout from "../../../components/OrgLayout";
+import axios from "axios";
+import { useAuth } from "../../../context/AuthContext";
+import Link from "next/link";
+import Head from "next/head";
+import {
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  EyeIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
+  UserIcon,
+  BriefcaseIcon,
+  CalendarIcon,
+  MapPinIcon,
+} from "@heroicons/react/24/outline";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export default function ApplicationsIndex() {
-  const [applications, setApplications] = useState([
-    {
-      id: 1,
-      volunteer: "Taonga Nyirenda",
-      opportunity: "Community Clean-Up",
-      appliedOn: "Apr 5, 2025",
-      matchedSkills: "4/5",
-      status: "Pending"
-    },
-    {
-      id: 2,
-      volunteer: "John Doe",
-      opportunity: "Teach Kids to Code",
-      appliedOn: "Mar 28, 2025",
-      matchedSkills: "5/5",
-      status: "Accepted"
+  const { token } = useAuth();
+  const [applications, setApplications] = useState([]);
+  const [filteredApplications, setFilteredApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [actionLoading, setActionLoading] = useState({});
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    accepted: 0,
+    rejected: 0
+  });
+
+  // Fetch applications
+  useEffect(() => {
+    if (!token) return;
+    setLoading(true);
+    setApiError("");
+    axios
+      .get(`${API_BASE}/applications`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+        const apps = res.data.data || res.data || [];
+        setApplications(apps);
+
+        // Calculate stats
+        const stats = {
+          total: apps.length,
+          pending: apps.filter(app => app.status?.toLowerCase() === 'pending').length,
+          accepted: apps.filter(app => app.status?.toLowerCase() === 'accepted').length,
+          rejected: apps.filter(app => app.status?.toLowerCase() === 'rejected').length,
+        };
+        setStats(stats);
+      })
+      .catch((e) => {
+        setApiError("Failed to load applications. Please try again.");
+      })
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  // Filter applications based on search and status
+  useEffect(() => {
+    let filtered = applications;
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(app =>
+        (app.volunteer_name || app.volunteer?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (app.opportunity_title || app.opportunity?.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (app.volunteer_email || app.volunteer?.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-  ]);
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(app =>
+        (app.status || '').toLowerCase() === statusFilter.toLowerCase()
+      );
+    }
+
+    setFilteredApplications(filtered);
+  }, [applications, searchTerm, statusFilter]);
+
+  // Quick action handlers
+  const handleQuickAction = async (applicationId, action) => {
+    setActionLoading(prev => ({ ...prev, [applicationId]: true }));
+
+    try {
+      await axios.put(
+        `${API_BASE}/applications/${applicationId}/respond`,
+        { status: action },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Update local state
+      setApplications(prev =>
+        prev.map(app =>
+          app.id === applicationId
+            ? { ...app, status: action, responded_at: new Date().toISOString() }
+            : app
+        )
+      );
+
+      // Update stats
+      const updatedApps = applications.map(app =>
+        app.id === applicationId ? { ...app, status: action } : app
+      );
+      const newStats = {
+        total: updatedApps.length,
+        pending: updatedApps.filter(app => app.status?.toLowerCase() === 'pending').length,
+        accepted: updatedApps.filter(app => app.status?.toLowerCase() === 'accepted').length,
+        rejected: updatedApps.filter(app => app.status?.toLowerCase() === 'rejected').length,
+      };
+      setStats(newStats);
+
+    } catch (error) {
+      console.error('Failed to update application:', error);
+      alert('Failed to update application. Please try again.');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [applicationId]: false }));
+    }
+  };
 
   return (
-    <OrgLayout>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Volunteer Applications</h1>
+    <>
+      <Head>
+        <title>Applications - Organization Dashboard</title>
+        <meta name="description" content="Manage volunteer applications for your organization" />
+      </Head>
 
-        {/* Application List */}
-        <div className="space-y-4">
-          {applications.map((app) => (
-            <div key={app.id} className="bg-white shadow-md rounded-lg p-4 hover:shadow-lg transition border-l-4 border-blue-500">
-              <h3 className="font-semibold">{app.volunteer}</h3>
-              <p className="text-sm text-gray-600 mt-1">Applied to: {app.opportunity}</p>
-              <p className="text-xs text-gray-500 mt-1">Skill match: {app.matchedSkills}</p>
-              <p className="text-xs text-gray-500 mt-1">Applied on: {app.appliedOn}</p>
-              <span className={`inline-block mt-2 text-xs px-2 py-1 rounded ${
-                app.status === "Pending"
-                  ? "bg-yellow-100 text-yellow-800"
-                  : app.status === "Accepted"
-                  ? "bg-green-100 text-green-800"
-                  : "bg-red-100 text-red-800"
-              }`}>
-                Status: {app.status}
-              </span>
-              <a
-                href={`/organization/opportunities/${app.id}/applications`}
-                className="text-indigo-600 text-sm hover:underline ml-4"
-              >
-                View Details →
-              </a>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Volunteer Applications</h1>
+            <p className="text-gray-600 mt-1">Review and manage applications to your opportunities</p>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Applications</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <BriefcaseIcon className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
-          ))}
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending Review</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+              </div>
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <ClockIcon className="w-6 h-6 text-yellow-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Accepted</p>
+                <p className="text-2xl font-bold text-green-600">{stats.accepted}</p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <CheckCircleIcon className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Rejected</p>
+                <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+              </div>
+              <div className="p-3 bg-red-100 rounded-lg">
+                <XCircleIcon className="w-6 h-6 text-red-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1">
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by volunteer name, opportunity, or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex items-center gap-2">
+              <FunnelIcon className="w-5 h-5 text-gray-400" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="accepted">Accepted</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Applications List */}
+        {loading ? (
+          <div className="bg-white p-12 rounded-xl shadow-sm border border-gray-200 text-center">
+            <div className="text-gray-500">Loading applications...</div>
+          </div>
+        ) : apiError ? (
+          <div className="bg-white p-12 rounded-xl shadow-sm border border-gray-200 text-center">
+            <div className="text-red-600 font-semibold">{apiError}</div>
+          </div>
+        ) : filteredApplications.length === 0 ? (
+          <div className="bg-white p-12 rounded-xl shadow-sm border border-gray-200 text-center">
+            <BriefcaseIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <div className="text-gray-500 text-lg">
+              {applications.length === 0 ? "No applications received yet" : "No applications match your filters"}
+            </div>
+            <p className="text-gray-400 mt-2">
+              {applications.length === 0
+                ? "Applications will appear here when volunteers apply to your opportunities"
+                : "Try adjusting your search or filter criteria"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredApplications.map((app) => (
+              <ApplicationCard
+                key={app.id}
+                application={app}
+                onQuickAction={handleQuickAction}
+                actionLoading={actionLoading[app.id]}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// Application Card Component
+function ApplicationCard({ application, onQuickAction, actionLoading }) {
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'accepted': return 'bg-green-100 text-green-800 border-green-200';
+      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        {/* Main Info */}
+        <div className="flex-1 space-y-3">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <UserIcon className="w-5 h-5 text-gray-400" />
+                {application.volunteer_name || application.volunteer?.name || "Unknown Volunteer"}
+              </h3>
+              <p className="text-gray-600 text-sm mt-1">
+                {application.volunteer_email || application.volunteer?.email || "No email provided"}
+              </p>
+            </div>
+            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(application.status)}`}>
+              {application.status || 'Unknown'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-600">
+            <div className="flex items-center gap-2">
+              <BriefcaseIcon className="w-4 h-4 text-gray-400" />
+              <span className="font-medium">Opportunity:</span>
+              <span>{application.opportunity_title || application.opportunity?.title || "Unknown"}</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="w-4 h-4 text-gray-400" />
+              <span className="font-medium">Applied:</span>
+              <span>{formatDate(application.applied_at || application.applied_on)}</span>
+            </div>
+
+            {application.opportunity?.location && (
+              <div className="flex items-center gap-2">
+                <MapPinIcon className="w-4 h-4 text-gray-400" />
+                <span className="font-medium">Location:</span>
+                <span>{application.opportunity.location}</span>
+              </div>
+            )}
+
+            {application.responded_at && (
+              <div className="flex items-center gap-2">
+                <ClockIcon className="w-4 h-4 text-gray-400" />
+                <span className="font-medium">Responded:</span>
+                <span>{formatDate(application.responded_at)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Skills Match */}
+          {application.volunteer?.skills && application.opportunity?.skills && (
+            <div className="flex flex-wrap gap-1">
+              {application.volunteer.skills.slice(0, 3).map((skill, idx) => (
+                <span
+                  key={idx}
+                  className={`px-2 py-1 rounded-full text-xs ${
+                    application.opportunity.skills.includes(skill)
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {skill}
+                </span>
+              ))}
+              {application.volunteer.skills.length > 3 && (
+                <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
+                  +{application.volunteer.skills.length - 3} more
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-2 lg:flex-col lg:w-48">
+          <Link
+            href={`/organization/applications/${application.id}`}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            <EyeIcon className="w-4 h-4" />
+            View Details
+          </Link>
+
+          {application.status?.toLowerCase() === 'pending' && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => onQuickAction(application.id, 'accepted')}
+                disabled={actionLoading}
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                <CheckCircleIcon className="w-4 h-4" />
+                Accept
+              </button>
+              <button
+                onClick={() => onQuickAction(application.id, 'rejected')}
+                disabled={actionLoading}
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                <XCircleIcon className="w-4 h-4" />
+                Reject
+              </button>
+            </div>
+          )}
         </div>
       </div>
-    </OrgLayout>
+    </div>
   );
 }
