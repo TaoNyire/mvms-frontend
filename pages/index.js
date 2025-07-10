@@ -66,30 +66,8 @@ export default function Home() {
           totalOpportunities: 3
         });
 
-        // Set sample opportunities for demonstration
-        setOpportunities([
-          {
-            id: 1,
-            title: "Community Garden Project",
-            description: "Help establish and maintain a community garden to provide fresh produce for local families.",
-            location: "Downtown Community Center",
-            category: "Environment"
-          },
-          {
-            id: 2,
-            title: "Youth Education Support",
-            description: "Assist with after-school tutoring and mentoring programs for underprivileged children.",
-            location: "Lilongwe Primary School",
-            category: "Education"
-          },
-          {
-            id: 3,
-            title: "Healthcare Outreach Program",
-            description: "Support mobile health clinics in rural areas with patient registration and health education.",
-            location: "Rural Blantyre District",
-            category: "Healthcare"
-          }
-        ]);
+        // Set empty data - no sample data
+        setOpportunities([]);
       } finally {
         setLoading(false);
       }

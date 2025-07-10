@@ -121,35 +121,8 @@ export default function SecurityAndRoles() {
     }
   };
 
-  const securityLogs = [
-    {
-      id: 1,
-      type: "login",
-      user: "admin@mvms.org",
-      action: "Successful login",
-      ip: "192.168.1.100",
-      timestamp: "2024-01-15 10:30:00",
-      status: "success"
-    },
-    {
-      id: 2,
-      type: "failed_login",
-      user: "unknown@example.com",
-      action: "Failed login attempt",
-      ip: "203.0.113.45",
-      timestamp: "2024-01-15 09:15:00",
-      status: "warning"
-    },
-    {
-      id: 3,
-      type: "permission_change",
-      user: "admin@mvms.org",
-      action: "Updated user permissions",
-      ip: "192.168.1.100",
-      timestamp: "2024-01-15 08:45:00",
-      status: "info"
-    }
-  ];
+  // Security logs should come from backend API
+  const [securityLogs, setSecurityLogs] = useState([]);
 
   const getStatusColor = (status) => {
     switch (status) {

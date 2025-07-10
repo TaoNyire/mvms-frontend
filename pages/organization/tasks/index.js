@@ -67,70 +67,21 @@ export default function OrganizationTasks() {
       // Provide sample data for demonstration if API fails
       console.log("Using sample data due to API error");
 
-      // Always use sample data for now until API is fixed
-        setApplications([
-          {
-            id: 1,
-            volunteer: {
-              id: 1,
-              name: "John Doe",
-              email: "john@example.com"
-            },
-            opportunity: {
-              id: 1,
-              title: "Community Garden Project",
-              location: "Downtown Community Center",
-              start_date: "2024-01-15",
-              end_date: "2024-02-15"
-            },
-            status: "accepted",
-            applied_at: "2024-01-10T10:00:00Z",
-            responded_at: "2024-01-12T14:30:00Z",
-            feedback_rating: null,
-            feedback_comment: null,
-            task_status: null
-          },
-          {
-            id: 2,
-            volunteer: {
-              id: 2,
-              name: "Jane Smith",
-              email: "jane@example.com"
-            },
-            opportunity: {
-              id: 2,
-              title: "Food Bank Assistance",
-              location: "City Food Bank",
-              start_date: "2024-01-20",
-              end_date: "2024-02-20"
-            },
-            status: "accepted",
-            applied_at: "2024-01-15T09:00:00Z",
-            responded_at: "2024-01-16T11:00:00Z",
-            feedback_rating: 5,
-            feedback_comment: "Excellent volunteer!",
-            task_status: {
-              status: "completed",
-              started_at: "2024-01-20T08:00:00Z",
-              completed_at: "2024-02-15T17:00:00Z",
-              completion_notes: "All tasks completed successfully",
-              work_evidence: null
-            }
-          }
-        ]);
+      // Set empty data - no sample data
+        setApplications([]);
 
         // Set appropriate error message based on the error type
         if (error.response?.status === 401) {
-          setApiError("Authentication failed - using sample data for demonstration");
+          setApiError("Authentication failed. Please log in again.");
           console.log("Authentication error - user may need to log in again");
         } else if (error.response?.status === 403) {
-          setApiError("Access denied - using sample data for demonstration");
+          setApiError("Access denied. Please check your permissions.");
         } else if (error.response?.status === 500) {
-          setApiError("Server error - using sample data for demonstration");
+          setApiError("Server error. Please try again later.");
         } else if (error.code === 'NETWORK_ERROR' || !error.response) {
-          setApiError("Network error - using sample data for demonstration");
+          setApiError("Network error. Please check your connection and try again.");
         } else {
-          setApiError(`API error (${error.response?.status || 'Unknown'}) - using sample data for demonstration`);
+          setApiError(`Failed to load tasks (Error ${error.response?.status || 'Unknown'}). Please try again.`);
         }
 
     } finally {

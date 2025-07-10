@@ -15,12 +15,20 @@ import {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 function OpportunityCard({ opp, userSkills = [], onApply, isApplying, hasApplied }) {
-  // Calculate skill match
-  const userSkillNames = userSkills.map(skill => skill.name?.toLowerCase() || skill.toLowerCase());
+  // Calculate skill match - handle both string and object skills
+  const userSkillNames = userSkills.map(skill => {
+    if (typeof skill === 'string') return skill.toLowerCase();
+    if (skill && skill.name) return skill.name.toLowerCase();
+    return '';
+  }).filter(name => name); // Remove empty strings
+
   const skillsRequired = Array.isArray(opp.skills) ? opp.skills : (Array.isArray(opp.skills_required) ? opp.skills_required : []);
-  const matchedSkills = skillsRequired.filter(skill =>
-    userSkillNames.includes(skill.toLowerCase())
-  );
+
+  const matchedSkills = skillsRequired.filter(skill => {
+    const skillName = typeof skill === 'string' ? skill : (skill?.name || '');
+    return skillName && userSkillNames.includes(skillName.toLowerCase());
+  });
+
   const matchPercentage = skillsRequired.length > 0 ? Math.round((matchedSkills.length / skillsRequired.length) * 100) : 0;
 
   return (
@@ -62,9 +70,12 @@ function OpportunityCard({ opp, userSkills = [], onApply, isApplying, hasApplied
           <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Skills Required:</p>
           <div className="flex flex-wrap gap-1 sm:gap-2">
             {skillsRequired.map((skill, i) => {
-              const isMatched = matchedSkills.some(
-                (ms) => ms.toLowerCase() === skill.toLowerCase()
-              );
+              const skillName = typeof skill === 'string' ? skill : (skill?.name || '');
+              const isMatched = matchedSkills.some((ms) => {
+                const msName = typeof ms === 'string' ? ms : (ms?.name || '');
+                return msName.toLowerCase() === skillName.toLowerCase();
+              });
+
               return (
                 <span
                   key={i}
@@ -73,7 +84,7 @@ function OpportunityCard({ opp, userSkills = [], onApply, isApplying, hasApplied
                   }`}
                 >
                   {isMatched && <CheckCircleIcon className="w-3 h-3 inline mr-1" />}
-                  <span className="truncate">{skill}</span>
+                  <span className="truncate">{skillName}</span>
                 </span>
               );
             })}
@@ -177,70 +188,104 @@ export default function Opportunities() {
     console.log('Auth token present:', !!token);
     console.log('Full token:', token?.substring(0, 20) + '...');
 
-    const fetchAll = axios.get(`${API_BASE}/opportunities/public`);
+    // Try multiple public endpoints
+    const fetchAll = axios.get(`${API_BASE}/opportunities/public`).catch(async (error) => {
+      console.log('Primary public endpoint failed, trying alternatives...');
+      if (error.response?.status === 401) {
+        console.log('Trying alternative public endpoint...');
+        return axios.get(`${API_BASE}/public/opportunities`).catch(async (altError) => {
+          console.log('Alternative endpoint also failed, trying with auth...');
+          return axios.get(`${API_BASE}/opportunities/public`, authHeaders);
+        });
+      }
+      throw error;
+    });
+
     const fetchMatched = axios.get(`${API_BASE}/volunteer/recommended`, authHeaders);
     const fetchMyApplications = axios.get(`${API_BASE}/my-applications`, authHeaders);
-    const fetchUserSkills = axios.get(`${API_BASE}/my-skills`, authHeaders);
 
-    Promise.all([fetchAll, fetchMatched, fetchMyApplications, fetchUserSkills])
-      .then(([allRes, matchedRes, myAppsRes, skillsRes]) => {
-        console.log("✅ Successfully fetched real data from backend:");
-        console.log("- All opportunities:", allRes.data);
-        console.log("- Matched opportunities:", matchedRes.data);
-        console.log("- My applications:", myAppsRes.data);
-        console.log("- User skills:", skillsRes.data);
+    // Try skills endpoint with fallback
+    const fetchUserSkills = axios.get(`${API_BASE}/my-skills`, authHeaders).catch(async (error) => {
+      console.log('Primary skills endpoint failed, trying test endpoint...');
+      return axios.get(`${API_BASE}/test-my-skills`, authHeaders).catch((testError) => {
+        console.log('Test skills endpoint also failed, returning empty skills');
+        return { data: { skills: [], total_skills: 0, categories: [] } };
+      });
+    });
+
+    Promise.allSettled([fetchAll, fetchMatched, fetchMyApplications, fetchUserSkills])
+      .then((results) => {
+        console.log("📊 API Results:", results);
 
         // Process all opportunities
-        const allOppsData = allRes.data?.data || allRes.data || [];
-        console.log("📊 All opportunities count:", allOppsData.length);
-        setAllOpportunities(allOppsData);
+        const allResult = results[0];
+        if (allResult.status === 'fulfilled') {
+          const allOppsData = allResult.value.data?.data || allResult.value.data || [];
+          console.log("✅ All opportunities loaded:", allOppsData.length);
+          setAllOpportunities(allOppsData);
+        } else {
+          console.error("❌ Failed to load all opportunities:", allResult.reason);
+          setAllOpportunities([]);
+        }
 
         // Process matched opportunities
-        const matchedOppsData = matchedRes.data?.data || matchedRes.data || [];
-        console.log("🎯 Matched opportunities count:", matchedOppsData.length);
-        setMatchedOpportunities(matchedOppsData);
+        const matchedResult = results[1];
+        if (matchedResult.status === 'fulfilled') {
+          const matchedOppsData = matchedResult.value.data?.data || matchedResult.value.data || [];
+          console.log("✅ Matched opportunities loaded:", matchedOppsData.length);
+          setMatchedOpportunities(matchedOppsData);
+        } else {
+          console.error("❌ Failed to load matched opportunities:", matchedResult.reason);
+          setMatchedOpportunities([]);
+        }
+
+        // Process applications
+        const appsResult = results[2];
+        if (appsResult.status === 'fulfilled') {
+          const applicationsData = appsResult.value.data?.data || appsResult.value.data || [];
+          console.log("✅ Applications loaded:", applicationsData.length);
+          setAppliedOpportunityIds(
+            Array.isArray(applicationsData)
+              ? applicationsData.map((app) => app.opportunity?.id || app.opportunity_id)
+              : []
+          );
+        } else {
+          console.error("❌ Failed to load applications:", appsResult.reason);
+          setAppliedOpportunityIds([]);
+        }
 
         // Process user skills
-        const userSkillsData = skillsRes.data?.skills || skillsRes.data || [];
-        console.log("🎓 User skills count:", userSkillsData.length);
-        setUserSkills(userSkillsData);
+        const skillsResult = results[3];
+        if (skillsResult.status === 'fulfilled') {
+          const userSkillsData = skillsResult.value.data?.skills || skillsResult.value.data || [];
+          console.log("✅ User skills loaded:", userSkillsData.length);
+          setUserSkills(userSkillsData);
+        } else {
+          console.error("❌ Failed to load user skills:", skillsResult.reason);
+          setUserSkills([]);
+        }
 
-        // Collect IDs of opportunities the user has already applied for
-        const applicationsData = myAppsRes.data?.data || myAppsRes.data || [];
-        console.log("📝 Applications count:", applicationsData.length);
-        setAppliedOpportunityIds(
-          Array.isArray(applicationsData)
-            ? applicationsData.map((app) => app.opportunity?.id || app.opportunity_id)
-            : []
-        );
+        // Check if any critical endpoints failed
+        const criticalFailures = results.slice(0, 2).filter(r => r.status === 'rejected');
+        if (criticalFailures.length > 0) {
+          const failedEndpoints = [];
+          if (results[0].status === 'rejected') failedEndpoints.push('All Opportunities');
+          if (results[1].status === 'rejected') failedEndpoints.push('Matched Opportunities');
+
+          setError(`Failed to load: ${failedEndpoints.join(', ')}. Please refresh the page.`);
+        }
       })
       .catch((error) => {
-        console.error("❌ Failed to fetch opportunities from backend:", error);
-        console.error("Error details:", {
-          message: error.message,
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data
-        });
+        console.error("❌ Critical error in Promise.allSettled:", error);
 
-        // Set empty arrays and show proper error
+        // Set empty arrays
         setAllOpportunities([]);
         setMatchedOpportunities([]);
         setUserSkills([]);
         setAppliedOpportunityIds([]);
 
-        // Show specific error message based on error type
-        if (error.response?.status === 401) {
-          setError("Authentication failed. Please log in again.");
-        } else if (error.response?.status === 403) {
-          setError("Access denied. Please check your permissions.");
-        } else if (error.response?.status === 500) {
-          setError("Server error. Please try again later or contact support.");
-        } else if (!error.response) {
-          setError("Network error. Please check your internet connection and try again.");
-        } else {
-          setError(`Failed to load opportunities (Error ${error.response?.status || 'Unknown'}). Please try again later.`);
-        }
+        // Show generic error for unexpected failures
+        setError("Unexpected error occurred. Please refresh the page or contact support.");
       })
       .finally(() => setApiLoading(false));
   }, [token]);
@@ -263,9 +308,13 @@ export default function Opportunities() {
   }, [filter, allOpportunities, matchedOpportunities, searchTerm]);
 
   function getUserSkills() {
-    return Array.isArray(user?.skills)
-      ? user.skills.map((s) => s.toLowerCase())
-      : [];
+    if (!Array.isArray(user?.skills)) return [];
+
+    return user.skills.map((s) => {
+      if (typeof s === 'string') return s.toLowerCase();
+      if (s && s.name) return s.name.toLowerCase();
+      return '';
+    }).filter(name => name); // Remove empty strings
   }
 
   // Handles application to an opportunity

@@ -56,54 +56,19 @@ export default function Notifications() {
         message: error.message
       });
 
-      // Provide sample notifications if API fails
-      console.log('Using sample notifications due to API error');
-      const sampleNotifications = [
-        {
-          id: 'sample_1',
-          type: 'success',
-          title: 'Application Accepted',
-          message: 'Your application for "Community Garden Project" has been accepted!',
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          read: false
-        },
-        {
-          id: 'sample_2',
-          type: 'info',
-          title: 'New Opportunity Match',
-          message: 'We found a new opportunity that matches your skills: "Youth Mentoring Program"',
-          timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          read: false
-        },
-        {
-          id: 'sample_3',
-          type: 'warning',
-          title: 'Profile Incomplete',
-          message: 'Complete your profile to get better opportunity matches.',
-          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          read: true
-        },
-        {
-          id: 'sample_4',
-          type: 'info',
-          title: 'Feedback Received',
-          message: 'You received feedback from Green Earth Organization.',
-          timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          read: true
-        }
-      ];
-
-      setNotifications(sampleNotifications);
+      // Set empty data - no sample data
+      console.log('API error - no notifications data available');
+      setNotifications([]);
 
       // Set appropriate error message
       if (error.response?.status === 401) {
-        setApiError("Authentication failed - using sample data for demonstration");
+        setApiError("Authentication failed. Please log in again.");
       } else if (error.response?.status === 403) {
-        setApiError("Access denied - using sample data for demonstration");
+        setApiError("Access denied. Please check your permissions.");
       } else if (error.response?.status === 500) {
-        setApiError("Server error - using sample data for demonstration");
+        setApiError("Server error. Please try again later.");
       } else if (!error.response) {
-        setApiError("Network error - using sample data for demonstration");
+        setApiError("Network error. Please check your connection and try again.");
       } else {
         setApiError(`API error (${error.response?.status || 'Unknown'}) - using sample data for demonstration`);
       }

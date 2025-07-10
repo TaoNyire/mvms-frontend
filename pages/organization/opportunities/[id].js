@@ -78,49 +78,11 @@ export default function OpportunityDetails() {
         errorMessage = error.response.data.message;
       } else if (error.response?.status === 500) {
         // Provide sample data for demonstration if API fails
-        console.log("Using sample data due to API error");
-        setOpportunity({
-          id: id,
-          title: "Sample Opportunity",
-          description: "This is sample data shown because the API is currently unavailable.",
-          location: "Sample Location",
-          start_date: "2024-01-15",
-          end_date: "2024-02-15",
-          volunteers_needed: 5,
-          applications_count: 3,
-          status: "active",
-          skills: [
-            { id: 1, name: "Community Service" },
-            { id: 2, name: "Event Planning" }
-          ],
-          organization: {
-            id: 1,
-            name: "Sample Organization"
-          }
-        });
-        setApplications([
-          {
-            id: 1,
-            status: "pending",
-            applied_at: "2024-01-10T10:00:00Z",
-            volunteer: {
-              id: 1,
-              name: "John Doe",
-              email: "john@example.com"
-            }
-          },
-          {
-            id: 2,
-            status: "accepted",
-            applied_at: "2024-01-12T14:00:00Z",
-            volunteer: {
-              id: 2,
-              name: "Jane Smith",
-              email: "jane@example.com"
-            }
-          }
-        ]);
-        errorMessage = "Using sample data - API connection issue";
+        console.log("API error - no sample data provided");
+        // Set empty data - no sample data
+        setOpportunity(null);
+        setApplications([]);
+        errorMessage = "Failed to load opportunity data. Please try again later.";
       }
 
       setApiError(errorMessage);

@@ -80,42 +80,9 @@ export default function ViewApplication() {
       console.error("Error response:", error.response?.data);
 
       if (error.response?.status === 500) {
-        // Provide sample data for demonstration
-        const sampleApplication = {
-          id: id,
-          status: "pending",
-          applied_at: "2024-01-15T10:30:00Z",
-          responded_at: null,
-          feedback_rating: null,
-          feedback_comment: null,
-          volunteer: {
-            id: 1,
-            name: "John Doe",
-            email: "john.doe@example.com",
-            phone: "+265 999 123 456",
-            location: "Lilongwe, Malawi",
-            profile: {
-              bio: "Passionate about community development and helping others. I have experience in education and youth mentoring.",
-              skills: ["Teaching", "Community Outreach", "Event Planning", "Youth Mentoring"],
-              experience: "3 years of volunteer experience with local NGOs",
-              availability: "Weekends and evenings",
-              motivation: "I want to make a positive impact in my community and help young people reach their potential."
-            }
-          },
-          opportunity: {
-            id: 1,
-            title: "Youth Education Program",
-            description: "Help teach basic literacy and numeracy to underprivileged children",
-            location: "Lilongwe Community Center",
-            start_date: "2024-02-01",
-            end_date: "2024-05-31",
-            volunteers_needed: 5,
-            skills: ["Teaching", "Patience", "Communication"]
-          }
-        };
-
-        setApplication(sampleApplication);
-        setApiError("Using sample data - API connection issue");
+        // Set empty data - no sample data
+        setApplication(null);
+        setApiError("Server error. Please try again later.");
       } else {
         setApiError("Failed to load application. Please try again.");
       }

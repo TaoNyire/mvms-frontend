@@ -42,64 +42,19 @@ export default function PublicOpportunities() {
           message: error.message
         });
 
-        // Provide sample data for demonstration
-        console.log('Using sample data due to API error');
-        const sampleOpportunities = [
-          {
-            id: 1,
-            title: "Community Garden Project",
-            description: "Help establish and maintain a community garden to provide fresh produce for local families in need. This is a hands-on opportunity to make a real difference in food security.",
-            location: "Downtown Community Center",
-            start_date: "2024-02-01",
-            end_date: "2024-04-30",
-            volunteers_needed: 8,
-            category: "Environment",
-            skills: ["Gardening", "Community Outreach"],
-            organization: {
-              name: "Green Future Initiative"
-            }
-          },
-          {
-            id: 2,
-            title: "Youth Education Support",
-            description: "Assist with after-school tutoring and mentoring programs for underprivileged children. Help with homework, reading, and basic computer skills.",
-            location: "Lilongwe Primary School",
-            start_date: "2024-01-15",
-            end_date: "2024-06-15",
-            volunteers_needed: 12,
-            category: "Education",
-            skills: ["Teaching", "Mentoring", "Patience"],
-            organization: {
-              name: "Education for All Malawi"
-            }
-          },
-          {
-            id: 3,
-            title: "Healthcare Outreach Program",
-            description: "Support mobile health clinics in rural areas. Assist with patient registration, basic health education, and community health awareness campaigns.",
-            location: "Rural Blantyre District",
-            start_date: "2024-03-01",
-            end_date: "2024-05-31",
-            volunteers_needed: 6,
-            category: "Healthcare",
-            skills: ["Healthcare", "Communication", "Community Service"],
-            organization: {
-              name: "Malawi Health Partners"
-            }
-          }
-        ];
+        // Set empty data - no sample data
+        console.log('API error - no opportunities data available');
+        setOpportunities([]);
 
-        setOpportunities(sampleOpportunities);
-
-        // Set a more user-friendly error message
+        // Set appropriate error message
         if (error.response?.status === 401) {
-          setError('Using sample data for demonstration - API authentication required');
+          setError('Authentication required. Please log in to view opportunities.');
         } else if (error.response?.status === 500) {
-          setError('Using sample data for demonstration - server temporarily unavailable');
+          setError('Server error. Please try again later.');
         } else if (!error.response) {
-          setError('Using sample data for demonstration - network connection issue');
+          setError('Network error. Please check your connection and try again.');
         } else {
-          setError('Using sample data for demonstration - API temporarily unavailable');
+          setError('Failed to load opportunities. Please try again later.');
         }
       } finally {
         setLoading(false);

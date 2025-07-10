@@ -99,15 +99,33 @@ export default function VolunteerSkills() {
 
     try {
       setFormLoading(true);
-      
-      const response = await axios.post(`${API_BASE}/my-skills`, {
+
+      const skillData = {
         skill_id: parseInt(selectedSkillId),
         proficiency_level: proficiencyLevel,
         years_experience: yearsExperience ? parseInt(yearsExperience) : null,
         notes: notes
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      };
+
+      console.log('Adding skill with data:', skillData);
+
+      // Try the main endpoint first, then test endpoint as fallback
+      let response;
+      try {
+        response = await axios.post(`${API_BASE}/my-skills`, skillData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (mainError) {
+        console.log('Main endpoint failed, trying test endpoint:', mainError.response?.data);
+
+        // Try test endpoint to debug
+        const testResponse = await axios.post(`${API_BASE}/test-add-skill`, skillData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        console.log('Test endpoint response:', testResponse.data);
+        throw mainError; // Re-throw the original error
+      }
 
       // Refresh user skills
       await fetchData();
