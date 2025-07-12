@@ -139,7 +139,21 @@ export default function VolunteerSkills() {
       
     } catch (error) {
       console.error('Error adding skill:', error);
-      setApiError(error.response?.data?.message || "Failed to add skill");
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+
+      if (error.response?.status === 422) {
+        // Validation error
+        const validationErrors = error.response.data?.errors;
+        if (validationErrors) {
+          const errorMessages = Object.values(validationErrors).flat().join(', ');
+          setApiError(`Validation error: ${errorMessages}`);
+        } else {
+          setApiError(error.response.data?.message || "Validation failed");
+        }
+      } else {
+        setApiError(error.response?.data?.message || "Failed to add skill");
+      }
     } finally {
       setFormLoading(false);
     }

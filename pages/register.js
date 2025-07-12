@@ -138,9 +138,9 @@ export default function Register() {
       await register(form);
 
       if (form.role === "volunteer") {
-        router.push("/volunteer/dashboard");
+        router.push("/volunteer/profile");
       } else if (form.role === "organization") {
-        router.push("/organization/dashboard");
+        router.push("/organization/profile");
       } else if (form.role === "admin") {
         router.push("/admin/dashboard");
       }

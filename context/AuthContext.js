@@ -10,6 +10,8 @@ export function AuthProvider({ children }) {
   );
   const [loading, setLoading] = useState(true);
   const [authVerified, setAuthVerified] = useState(false);
+  const [profileComplete, setProfileComplete] = useState(false);
+  const [profileRequirements, setProfileRequirements] = useState(null);
 
   // Automatically fetch user if token exists
   useEffect(() => {
@@ -81,6 +83,65 @@ export function AuthProvider({ children }) {
     console.log("Local logout completed");
   };
 
+  // Helper function to handle 403 errors
+  const handle403Error = (error, requiredRole = null) => {
+    if (error.response?.status === 403) {
+      const message = requiredRole
+        ? `Access denied. You need the '${requiredRole}' role to access this feature.`
+        : 'Access denied. You do not have permission to access this feature.';
+
+      console.warn('403 Forbidden:', message);
+      return {
+        isPermissionError: true,
+        message,
+        suggestedAction: requiredRole ? `Please contact an administrator to assign you the '${requiredRole}' role.` : 'Please contact an administrator for access.'
+      };
+    }
+    return { isPermissionError: false };
+  };
+
+  // Check profile completion
+  const checkProfileCompletion = async () => {
+    if (!token || !user) return true;
+
+    try {
+      // Try to access a protected endpoint based on user role
+      const endpoint = user.role === 'volunteer' ? '/volunteer/dashboard' : '/organization/dashboard';
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
+
+      if (response.status === 422) {
+        const data = await response.json();
+        if (data.error === 'PROFILE_INCOMPLETE') {
+          setProfileComplete(false);
+          setProfileRequirements(data.requirements);
+          return false;
+        }
+      }
+
+      if (response.ok) {
+        setProfileComplete(true);
+        setProfileRequirements(null);
+        return true;
+      }
+
+      // For other errors, assume profile is complete to avoid blocking
+      setProfileComplete(true);
+      setProfileRequirements(null);
+      return true;
+    } catch (error) {
+      console.error('Error checking profile completion:', error);
+      // Assume complete on error to avoid blocking
+      setProfileComplete(true);
+      setProfileRequirements(null);
+      return true;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -88,10 +149,14 @@ export function AuthProvider({ children }) {
         token,
         loading,
         authVerified,
+        profileComplete,
+        profileRequirements,
         login,
         logout,
         register,
-        setAuthVerified
+        setAuthVerified,
+        handle403Error,
+        checkProfileCompletion
       }}
     >
       {children}

@@ -6,12 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 const sidebarLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: "🏠" },
   { href: "/admin/users", label: "User Management", icon: "👥" },
-  { href: "/admin/organizations", label: "Organizations", icon: "🏢" },
-  { href: "/admin/opportunities", label: "Opportunities", icon: "🎯" },
-  { href: "/admin/applications", label: "Applications", icon: "📋" },
-  { href: "/admin/security", label: "Security & Roles", icon: "🔒" },
   { href: "/admin/logs", label: "System Logs", icon: "📊" },
-  { href: "/admin/maintenance", label: "Maintenance", icon: "🛠️" },
 ];
 
 export default function AdminSidebar() {

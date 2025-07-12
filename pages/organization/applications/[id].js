@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import OrgLayout from "../../../components/organization/OrgLayout";
+import FeedbackInitiator from "../../../components/feedback/FeedbackInitiator";
 import axios from "axios";
 import { useAuth } from "../../../context/AuthContext";
 import { useRouter } from "next/router";
@@ -80,7 +81,7 @@ export default function ViewApplication() {
       console.error("Error response:", error.response?.data);
 
       if (error.response?.status === 500) {
-        // Set empty data - no sample data
+        // Set empty data
         setApplication(null);
         setApiError("Server error. Please try again later.");
       } else {
@@ -239,9 +240,17 @@ export default function ViewApplication() {
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-3xl font-bold mb-2">Application #{application.id}</h1>
-                  <p className="text-emerald-100 text-lg">
-                    {application.volunteer?.name || 'Unknown Volunteer'}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-emerald-100 text-lg">
+                      {application.volunteer?.name || 'Unknown Volunteer'}
+                    </p>
+                    {application.volunteer?.volunteer_profile?.cv_url && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-200 text-emerald-800 text-xs font-medium rounded-full">
+                        <DocumentTextIcon className="w-3 h-3" />
+                        CV Available
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="mb-2">
@@ -296,6 +305,36 @@ export default function ViewApplication() {
                         <div>
                           <p className="text-sm text-gray-600">Phone</p>
                           <p className="font-medium text-gray-900">{application.volunteer?.phone || 'Not provided'}</p>
+                        </div>
+                      </div>
+
+                      {/* CV Download Section */}
+                      <div className="flex items-center gap-3">
+                        <DocumentTextIcon className="w-5 h-5 text-gray-400" />
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">CV/Resume</p>
+                          {application.volunteer?.volunteer_profile?.cv_url ? (
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={application.volunteer.volunteer_profile.cv_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Download CV
+                              </a>
+                              {application.volunteer.volunteer_profile.cv_original_name && (
+                                <span className="text-xs text-gray-500">
+                                  ({application.volunteer.volunteer_profile.cv_original_name})
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="font-medium text-gray-500">No CV uploaded</p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -617,7 +656,7 @@ export default function ViewApplication() {
           </div>
 
           {/* Response Modal */}
-            {showResponseForm && (
+          {showResponseForm && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
                   <div className="p-6">
@@ -769,7 +808,6 @@ export default function ViewApplication() {
                 </div>
               </div>
             )}
-          </div>
 
           {/* Success Messages */}
           {actionSuccess && (

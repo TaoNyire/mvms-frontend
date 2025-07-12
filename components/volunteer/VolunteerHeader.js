@@ -40,8 +40,14 @@ export default function VolunteerHeader() {
 
       } catch (error) {
         console.error('Error fetching notification count:', error);
-        // Use sample count if API fails
-        setUnreadCount(2);
+
+        // If it's a profile completion error, set count to 0 to avoid showing misleading data
+        if (error.response?.status === 422 && error.response?.data?.error === 'PROFILE_INCOMPLETE') {
+          setUnreadCount(0);
+        } else {
+          // Use sample count for other errors
+          setUnreadCount(2);
+        }
       }
     };
 

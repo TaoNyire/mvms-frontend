@@ -153,7 +153,7 @@ function FilterControls({ filter, setFilter, searchTerm, setSearchTerm }) {
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
-            ⭐ Matched Only
+            ⭐ Skill Matches Only
           </button>
         </div>
       </div>
@@ -168,6 +168,7 @@ export default function Opportunities() {
   const [allOpportunities, setAllOpportunities] = useState([]);
   const [matchedOpportunities, setMatchedOpportunities] = useState([]);
   const [appliedOpportunityIds, setAppliedOpportunityIds] = useState([]);
+  const [currentApplications, setCurrentApplications] = useState([]);
   const [userSkills, setUserSkills] = useState([]);
   const [applyingId, setApplyingId] = useState(null); // Opportunity ID currently being applied for
   const [filter, setFilter] = useState("matched");
@@ -244,6 +245,11 @@ export default function Opportunities() {
         if (appsResult.status === 'fulfilled') {
           const applicationsData = appsResult.value.data?.data || appsResult.value.data || [];
           console.log("✅ Applications loaded:", applicationsData.length);
+
+          // Track all applications
+          setCurrentApplications(Array.isArray(applicationsData) ? applicationsData : []);
+
+          // Track applied opportunity IDs
           setAppliedOpportunityIds(
             Array.isArray(applicationsData)
               ? applicationsData.map((app) => app.opportunity?.id || app.opportunity_id)
@@ -252,6 +258,7 @@ export default function Opportunities() {
         } else {
           console.error("❌ Failed to load applications:", appsResult.reason);
           setAppliedOpportunityIds([]);
+          setCurrentApplications([]);
         }
 
         // Process user skills
@@ -298,13 +305,40 @@ export default function Opportunities() {
 
   const displayedOpportunities = useMemo(() => {
     const lowerSearch = searchTerm.toLowerCase();
-    let opps = filter === "matched" ? matchedOpportunities : allOpportunities;
+    let opps;
+
+    if (filter === "matched") {
+      // Show only matched opportunities
+      opps = matchedOpportunities;
+      console.log(`🎯 Showing matched opportunities only: ${opps?.length || 0} opportunities`);
+    } else {
+      // Show all opportunities (including matched ones)
+      // Combine all opportunities with matched opportunities, removing duplicates
+      const allOppsArray = Array.isArray(allOpportunities) ? allOpportunities : [];
+      const matchedOppsArray = Array.isArray(matchedOpportunities) ? matchedOpportunities : [];
+
+      // Create a Set of IDs from allOpportunities to avoid duplicates
+      const allOppsIds = new Set(allOppsArray.map(opp => opp.id));
+
+      // Add matched opportunities that aren't already in allOpportunities
+      const additionalMatched = matchedOppsArray.filter(opp => !allOppsIds.has(opp.id));
+
+      opps = [...allOppsArray, ...additionalMatched];
+
+      console.log(`📋 Showing all opportunities: ${allOppsArray.length} all + ${additionalMatched.length} additional matched = ${opps.length} total`);
+    }
+
     if (!Array.isArray(opps)) return [];
-    return opps.filter(
+
+    const filtered = opps.filter(
       (opp) =>
         opp.title?.toLowerCase().includes(lowerSearch) ||
         opp.location?.toLowerCase().includes(lowerSearch)
     );
+
+    console.log(`🔍 After search filter "${searchTerm}": ${filtered.length} opportunities`);
+
+    return filtered;
   }, [filter, allOpportunities, matchedOpportunities, searchTerm]);
 
   function getUserSkills() {
@@ -320,20 +354,55 @@ export default function Opportunities() {
   // Handles application to an opportunity
   async function handleApply(opportunityId) {
     if (!token) return;
+
+    // Check if CV is uploaded before allowing application
+    try {
+      const profileResponse = await axios.get(`${API_BASE}/volunteer/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!profileResponse.data.cv_url) {
+        if (confirm("You must upload your CV before applying for opportunities. Would you like to go to your profile page to upload it now?")) {
+          router.push('/volunteer/profile');
+        }
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking profile:', error);
+      alert("Unable to verify your profile. Please try again.");
+      return;
+    }
+
+    // Check application limit before applying
+    const activeApplications = currentApplications.filter(app =>
+      app.status === 'pending' || app.status === 'accepted'
+    );
+
+    if (activeApplications.length >= 2) {
+      alert("You can only apply to a maximum of 2 opportunities at a time. Please withdraw from an existing application or wait for a response before applying to new opportunities.");
+      return;
+    }
+
     setApplyingId(opportunityId);
     try {
-      await axios.post(
+      const response = await axios.post(
         `${API_BASE}/opportunities/${opportunityId}/apply`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      // Update both applied IDs and current applications
       setAppliedOpportunityIds((prev) => [...prev, opportunityId]);
+      setCurrentApplications((prev) => [...prev, response.data]);
+
+      alert("Application submitted successfully!");
     } catch (e) {
-      alert(
-        (e?.response?.data?.message && typeof e.response.data.message === "string"
-          ? e.response.data.message
-          : "Failed to submit application. Please try again.")
-      );
+      const errorMessage = e?.response?.data?.message;
+      if (e?.response?.data?.error_code === 'APPLICATION_LIMIT_REACHED') {
+        alert(errorMessage || "You have reached the maximum number of applications (2). Please withdraw from an existing application first.");
+      } else {
+        alert(errorMessage || "Failed to submit application. Please try again.");
+      }
     } finally {
       setApplyingId(null);
     }
@@ -388,6 +457,50 @@ export default function Opportunities() {
           </div>
         </div>
 
+        {/* Application Limit Indicator */}
+        {(() => {
+          const activeApplications = currentApplications.filter(app =>
+            app.status === 'pending' || app.status === 'accepted'
+          );
+          const applicationCount = activeApplications.length;
+
+          return (
+            <div className={`p-4 rounded-lg border ${
+              applicationCount >= 2
+                ? 'bg-red-50 border-red-200 text-red-800'
+                : applicationCount >= 1
+                  ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                  : 'bg-blue-50 border-blue-200 text-blue-800'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    applicationCount >= 2 ? 'bg-red-500' : applicationCount >= 1 ? 'bg-yellow-500' : 'bg-blue-500'
+                  }`}></div>
+                  <span className="font-medium">
+                    Applications: {applicationCount}/2
+                  </span>
+                </div>
+                {applicationCount >= 2 && (
+                  <span className="text-sm">
+                    Application limit reached. Withdraw from an existing application to apply for new opportunities.
+                  </span>
+                )}
+                {applicationCount === 1 && (
+                  <span className="text-sm">
+                    You can apply to 1 more opportunity.
+                  </span>
+                )}
+                {applicationCount === 0 && (
+                  <span className="text-sm">
+                    You can apply to up to 2 opportunities.
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         <FilterControls
           filter={filter}
           setFilter={setFilter}
@@ -407,7 +520,12 @@ export default function Opportunities() {
             </p>
             {filter === "matched" && (
               <p className="text-gray-400 text-xs sm:text-sm mt-2 px-4">
-                Try viewing all opportunities or update your skills in your profile.
+                No opportunities match your current skills. Try viewing all opportunities or update your skills in your profile.
+              </p>
+            )}
+            {filter === "all" && (
+              <p className="text-gray-400 text-xs sm:text-sm mt-2 px-4">
+                No opportunities available at the moment. Please check back later.
               </p>
             )}
           </div>

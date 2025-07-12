@@ -3,6 +3,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useAuth } from "../../../context/AuthContext";
 import axios from "axios";
+import FeedbackInitiator from "../../../components/feedback/FeedbackInitiator";
 import {
   ClockIcon,
   CheckCircleIcon,
@@ -168,6 +169,18 @@ export default function ApplicationDetail() {
             )}
           </div>
         </div>
+
+        {/* Feedback Section */}
+        {application && (
+          <div className="mt-8">
+            <FeedbackInitiator
+              applicationId={application.id}
+              userType="volunteer"
+              trigger="card"
+              className="w-full"
+            />
+          </div>
+        )}
       </div>
     </>
   );

@@ -29,6 +29,9 @@ export default function OrganizationMessages() {
   const [contacts, setContacts] = useState([]);
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [activeView, setActiveView] = useState('messages'); // 'messages' or 'announcements'
+  const [announcements, setAnnouncements] = useState([]);
 
   // Fetch conversations
   useEffect(() => {
@@ -153,6 +156,43 @@ export default function OrganizationMessages() {
     setSendingMessage(false);
   };
 
+  // Announcement functions
+  const fetchAnnouncements = async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/announcements`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAnnouncements(response.data.announcements || []);
+    } catch (error) {
+      console.error("Failed to fetch announcements:", error);
+      // Set sample announcements for demo
+      setAnnouncements([
+        {
+          id: 1,
+          title: "Welcome New Volunteers!",
+          message: "We're excited to have new volunteers joining our community outreach program.",
+          created_at: new Date().toISOString(),
+          recipients_count: 15,
+          opportunity: { title: "Community Outreach" }
+        }
+      ]);
+    }
+  };
+
+  const sendAnnouncement = async (announcementData) => {
+    try {
+      await axios.post(`${API_BASE}/announcements`, announcementData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchAnnouncements();
+      alert('Announcement sent successfully!');
+      setShowAnnouncementModal(false);
+    } catch (error) {
+      console.error("Failed to send announcement:", error);
+      alert("Failed to send announcement. Please try again.");
+    }
+  };
+
   return (
     <>
       <Head>
@@ -162,22 +202,59 @@ export default function OrganizationMessages() {
 
       <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Messages</h1>
-                <p className="text-gray-600 mt-1">Communicate with volunteers and manage conversations</p>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Communication Center</h1>
+                  <p className="text-gray-600 mt-1">Manage messages and send announcements to volunteers</p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowAnnouncementModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    Send Announcement
+                  </button>
+                  <button
+                    onClick={() => setShowNewMessage(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    New Message
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => setShowNewMessage(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <PlusIcon className="w-5 h-5" />
-                New Message
-              </button>
+
+              {/* View Toggle */}
+              <div className="flex gap-2 bg-white p-1 rounded-lg border border-gray-200 w-fit">
+                <button
+                  onClick={() => setActiveView('messages')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    activeView === 'messages'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Messages
+                </button>
+                <button
+                  onClick={() => setActiveView('announcements')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    activeView === 'announcements'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Announcements
+                </button>
+              </div>
             </div>
 
-            {/* Messages Interface */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" style={{ height: '70vh' }}>
+            {/* Content Area */}
+            {activeView === 'messages' ? (
+              /* Messages Interface */
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" style={{ height: '70vh' }}>
               <div className="flex h-full">
                 {/* Conversations List */}
                 <div className="w-1/3 border-r border-gray-200 flex flex-col">
@@ -318,7 +395,7 @@ export default function OrganizationMessages() {
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       placeholder="Type your message..."
-                      className="flex-1 border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900"
                       disabled={sendingMessage}
                     />
                     <button
@@ -354,6 +431,21 @@ export default function OrganizationMessages() {
           </div>
               </div>
             </div>
+            ) : (
+              /* Announcements View */
+              <AnnouncementsView
+                announcements={announcements}
+                onRefresh={fetchAnnouncements}
+              />
+            )}
+
+            {/* Announcement Modal */}
+            {showAnnouncementModal && (
+              <AnnouncementModal
+                onSend={sendAnnouncement}
+                onClose={() => setShowAnnouncementModal(false)}
+              />
+            )}
 
             {/* New Message Modal */}
             {showNewMessage && (
@@ -370,7 +462,7 @@ export default function OrganizationMessages() {
                         placeholder="Search volunteers..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900"
                       />
                     </div>
                   </div>
@@ -430,5 +522,165 @@ export default function OrganizationMessages() {
             )}
       </div>
     </>
+  );
+}
+
+// Component for announcements view
+function AnnouncementsView({ announcements, onRefresh }) {
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Announcements</h2>
+          <button
+            onClick={onRefresh}
+            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {announcements.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-gray-500 mb-2">No announcements sent yet</div>
+          <div className="text-sm text-gray-400">Send your first announcement to volunteers</div>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-200">
+          {announcements.map((announcement) => (
+            <div key={announcement.id} className="p-6 hover:bg-gray-50">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900 mb-2">{announcement.title}</h3>
+                  <p className="text-gray-700 mb-3">{announcement.message}</p>
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <span>Sent: {formatDate(announcement.created_at)}</span>
+                    <span>Recipients: {announcement.recipients_count || 0}</span>
+                    {announcement.opportunity && (
+                      <span>Opportunity: {announcement.opportunity.title}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Component for announcement modal
+function AnnouncementModal({ onSend, onClose }) {
+  const [title, setTitle] = React.useState('');
+  const [message, setMessage] = React.useState('');
+  const [targetAudience, setTargetAudience] = React.useState('all');
+  const [opportunityId, setOpportunityId] = React.useState('');
+
+  const handleSend = (e) => {
+    e.preventDefault();
+    if (!title.trim() || !message.trim()) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    onSend({
+      title: title.trim(),
+      message: message.trim(),
+      target_audience: targetAudience,
+      opportunity_id: opportunityId || null
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Send Announcement</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">×</button>
+        </div>
+
+        <form onSubmit={handleSend} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+              placeholder="Announcement title..."
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Message *</label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+              rows="4"
+              placeholder="Your announcement message..."
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Target Audience</label>
+            <select
+              value={targetAudience}
+              onChange={(e) => setTargetAudience(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+            >
+              <option value="all">All Volunteers</option>
+              <option value="active">Active Volunteers</option>
+              <option value="opportunity">Specific Opportunity</option>
+            </select>
+          </div>
+
+          {targetAudience === 'opportunity' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Select Opportunity</label>
+              <select
+                value={opportunityId}
+                onChange={(e) => setOpportunityId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                required
+              >
+                <option value="">Choose opportunity...</option>
+                {/* Opportunities would be loaded here */}
+              </select>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="submit"
+              className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Send Announcement
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
