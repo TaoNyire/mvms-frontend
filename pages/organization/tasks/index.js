@@ -8,6 +8,8 @@ import {
   PlayIcon,
   PlusIcon,
   ExclamationTriangleIcon,
+  PlusIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import {
   getApplications,
@@ -55,12 +57,22 @@ export default function OrganizationTasks() {
   }, [token, statusFilter, taskStatusFilter, activeView, currentPage, searchTerm]);
 
   const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
       setApiError("");
 
       console.log("Fetching applications...");
       console.log("Status Filter:", statusFilter);
+      console.log("Opportunity Filter:", selectedOpportunity);
+
+      const params = {};
+      if (statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
+      if (selectedOpportunity !== 'all') {
+        params.opportunity_id = selectedOpportunity;
+      }
       console.log("Opportunity Filter:", selectedOpportunity);
 
       const params = {};
@@ -77,9 +89,11 @@ export default function OrganizationTasks() {
 
       console.log("API Response:", response.data);
       setTasks(response.data.tasks || []);
+      setTasks(response.data.tasks || []);
       setApiError(""); // Clear any previous errors
 
     } catch (error) {
+      console.error("Failed to load tasks:", error);
       console.error("Failed to load tasks:", error);
       console.error("Error details:", {
         status: error.response?.status,
@@ -90,7 +104,22 @@ export default function OrganizationTasks() {
 
       // Set empty data
       setTasks([]);
+      // Set empty data
+      setTasks([]);
 
+      // Set appropriate error message based on the error type
+      if (error.response?.status === 401) {
+        setApiError("Authentication failed. Please log in again.");
+        console.log("Authentication error - user may need to log in again");
+      } else if (error.response?.status === 403) {
+        setApiError("Access denied. Please check your permissions.");
+      } else if (error.response?.status === 500) {
+        setApiError("Server error. Please try again later.");
+      } else if (error.code === 'NETWORK_ERROR' || !error.response) {
+        setApiError("Network error. Please check your connection and try again.");
+      } else {
+        setApiError(`Failed to load tasks (Error ${error.response?.status || 'Unknown'}). Please try again.`);
+      }
       // Set appropriate error message based on the error type
       if (error.response?.status === 401) {
         setApiError("Authentication failed. Please log in again.");
@@ -261,13 +290,50 @@ export default function OrganizationTasks() {
       ...prev,
       [field]: value
     }));
+    if (!taskFormData.opportunity_id || !taskFormData.title) {
+      alert('Please fill in required fields');
+      return;
+    }
+
+    // Clean up the data before sending
+    const cleanedData = {
+      ...taskFormData,
+      // Convert empty strings to null for optional fields
+      due_date: taskFormData.due_date || null,
+      estimated_hours: taskFormData.estimated_hours ? parseInt(taskFormData.estimated_hours) : null,
+      max_volunteers: parseInt(taskFormData.max_volunteers) || 1,
+      description: taskFormData.description || null,
+      instructions: taskFormData.instructions || null,
+      deliverables: taskFormData.deliverables.length > 0 ? taskFormData.deliverables : null
+    };
+
+    createTask(cleanedData);
+  };
+
+  const handleTaskFormChange = (field, value) => {
+    setTaskFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'active': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'paused': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'active': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'paused': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return 'bg-red-100 text-red-800 border-red-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low': return 'bg-green-100 text-green-800 border-green-200';
       case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -637,7 +703,11 @@ export default function OrganizationTasks() {
             taskFormData={taskFormData}
             onFormChange={handleTaskFormChange}
             onSubmit={handleCreateTask}
+            onFormChange={handleTaskFormChange}
+            onSubmit={handleCreateTask}
             onClose={() => {
+              setShowCreateModal(false);
+              resetTaskForm();
               setShowCreateModal(false);
               resetTaskForm();
             }}
@@ -860,6 +930,7 @@ function TaskStatusModal({ application, taskFormData, setTaskFormData, onSubmit,
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Update Task Status</h3>
