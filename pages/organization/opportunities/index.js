@@ -50,8 +50,15 @@ export default function OpportunitiesIndex() {
     <div>
         <h1 className="text-2xl font-bold mb-6">Posted Opportunities</h1>
 
-        {/* Add New Button */}
-        <div className="flex justify-end mb-4">
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center mb-4">
+          <Link
+            href="/organization/skills"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2"
+          >
+            <span>📚</span>
+            Manage Skills
+          </Link>
           <Link
             href="/organization/opportunities/create"
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded"

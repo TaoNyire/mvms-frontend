@@ -93,9 +93,12 @@ export default function OpportunityApplications() {
     setActionLoading({ ...actionLoading, [applicationId]: true });
 
     try {
+      // Convert action to status format expected by backend
+      const status = action === 'accept' ? 'accepted' : 'rejected';
+
       await axios.put(
-        `${API_BASE}/applications/${applicationId}/${action}`,
-        {},
+        `${API_BASE}/applications/${applicationId}/respond`,
+        { status },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

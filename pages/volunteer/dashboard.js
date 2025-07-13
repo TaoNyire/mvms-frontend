@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useRouter } from "next/router";
 import Head from "next/head";
+import FeedbackDashboard from "../../components/feedback/FeedbackDashboard";
 import axios from "axios";
 
 
@@ -435,7 +436,7 @@ export default function VolunteerDashboard() {
             )}
           </section>
 
-          {/* Feedback Section */}
+          {/* Enhanced Feedback Section */}
           <section>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
               <h3 className="text-lg sm:text-xl font-bold text-green-700">My Feedback</h3>
@@ -446,27 +447,7 @@ export default function VolunteerDashboard() {
                 See all feedback &rarr;
               </button>
             </div>
-            {safeFeedback.length === 0 ? (
-              <div className="text-gray-500 bg-white p-4 sm:p-6 rounded-xl shadow-sm text-center">
-                <div className="text-3xl sm:text-4xl mb-2">⭐</div>
-                <p className="text-sm sm:text-base">No feedback submitted or received yet.</p>
-                <p className="text-xs sm:text-sm text-gray-400 mt-1">Complete volunteer work to receive feedback!</p>
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
-                {safeFeedback.slice(0, 3).map((fb) => (
-                  <div key={fb.id} className="p-4 sm:p-6">
-                    <div className="font-semibold text-green-700 text-sm sm:text-base mb-2 truncate">
-                      For: {fb.organization?.name || fb.application?.opportunity?.organization?.name}
-                    </div>
-                    <div className="text-gray-700 text-xs sm:text-sm mb-2 line-clamp-2">{fb.comments}</div>
-                    <div className="text-gray-500 text-xs">
-                      Submitted: {new Date(fb.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <FeedbackDashboard userType="volunteer" />
           </section>
       </div>
     </>

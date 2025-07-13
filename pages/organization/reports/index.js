@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Head from "next/head";
 import axios from "axios";
 import { useAuth } from "../../../context/AuthContext";
+import OrgLayout from "../../../components/organization/OrgLayout";
 import {
   ChartBarIcon,
   DocumentArrowDownIcon,
@@ -23,6 +24,13 @@ export default function OrganizationReports() {
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
   const [dateRange, setDateRange] = useState("30");
+  const [reportType, setReportType] = useState("overview");
+  const [customFilters, setCustomFilters] = useState({
+    opportunity: "",
+    volunteer: "",
+    status: "all"
+  });
+  const [showExportModal, setShowExportModal] = useState(false);
   const [activeTab, setActiveTab] = useState("completed");
 
   useEffect(() => {
@@ -63,28 +71,133 @@ export default function OrganizationReports() {
 
   const exportReport = async (format = 'json') => {
     try {
-      // For now, just export the current reports data
       if (!reports) {
         alert('No report data to export. Please wait for reports to load.');
         return;
       }
 
-      const dataStr = JSON.stringify(reports, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      const exportFileDefaultName = `organization_report_${new Date().toISOString().split('T')[0]}.json`;
+      const timestamp = new Date().toISOString().split('T')[0];
+      const reportData = {
+        report_type: reportType,
+        date_range: dateRange,
+        generated_at: new Date().toISOString(),
+        organization: user?.name || 'Organization',
+        ...reports
+      };
+
+      let dataUri, fileName, mimeType;
+
+      switch (format) {
+        case 'csv':
+          const csvData = convertToCSV(reportData);
+          dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+          fileName = `${reportType}_report_${timestamp}.csv`;
+          break;
+
+        case 'pdf':
+          // For PDF, we'll create a simple HTML version and let browser handle PDF conversion
+          const htmlContent = generateHTMLReport(reportData);
+          const printWindow = window.open('', '_blank');
+          printWindow.document.write(htmlContent);
+          printWindow.document.close();
+          printWindow.print();
+          return;
+
+        case 'excel':
+          // For Excel, we'll use CSV format with .xlsx extension (simplified)
+          const excelData = convertToCSV(reportData);
+          dataUri = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(excelData);
+          fileName = `${reportType}_report_${timestamp}.xlsx`;
+          break;
+
+        default: // json
+          dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(reportData, null, 2));
+          fileName = `${reportType}_report_${timestamp}.json`;
+      }
+
       const linkElement = document.createElement('a');
       linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.setAttribute('download', fileName);
       linkElement.click();
+
     } catch (error) {
       console.error("Failed to export report:", error);
       alert("Failed to export report. Please try again.");
     }
   };
 
+  const convertToCSV = (data) => {
+    const headers = ['Metric', 'Value', 'Description'];
+    const rows = [headers.join(',')];
+
+    // Add opportunity statistics
+    if (data.opportunity_statistics) {
+      rows.push(`Total Opportunities,${data.opportunity_statistics.total || 0},Total number of opportunities`);
+      rows.push(`Active Opportunities,${data.opportunity_statistics.active || 0},Currently active opportunities`);
+      rows.push(`Completed Opportunities,${data.opportunity_statistics.completed || 0},Successfully completed opportunities`);
+    }
+
+    // Add volunteer statistics
+    if (data.volunteer_statistics) {
+      rows.push(`Total Volunteers,${data.volunteer_statistics.total || 0},Total registered volunteers`);
+      rows.push(`Active Volunteers,${data.volunteer_statistics.active || 0},Currently active volunteers`);
+    }
+
+    return rows.join('\n');
+  };
+
+  const generateHTMLReport = (data) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${data.report_type} Report - ${data.organization}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+          .stat-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
+          .stat-value { font-size: 24px; font-weight: bold; color: #2563eb; }
+          .stat-label { color: #666; margin-top: 5px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>${data.report_type.charAt(0).toUpperCase() + data.report_type.slice(1)} Report</h1>
+          <p>Generated on: ${new Date(data.generated_at).toLocaleDateString()}</p>
+          <p>Organization: ${data.organization}</p>
+          <p>Date Range: ${data.date_range} days</p>
+        </div>
+        <div class="stats">
+          ${data.opportunity_statistics ? `
+            <div class="stat-card">
+              <div class="stat-value">${data.opportunity_statistics.total || 0}</div>
+              <div class="stat-label">Total Opportunities</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${data.opportunity_statistics.active || 0}</div>
+              <div class="stat-label">Active Opportunities</div>
+            </div>
+          ` : ''}
+          ${data.volunteer_statistics ? `
+            <div class="stat-card">
+              <div class="stat-value">${data.volunteer_statistics.total || 0}</div>
+              <div class="stat-label">Total Volunteers</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${data.volunteer_statistics.active || 0}</div>
+              <div class="stat-label">Active Volunteers</div>
+            </div>
+          ` : ''}
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
   if (loading) {
     return (
-      <>
+      <OrgLayout>
         <Head>
           <title>Reports - Organization Dashboard</title>
           <meta name="description" content="View comprehensive reports on volunteer activities and completed opportunities" />
@@ -97,12 +210,12 @@ export default function OrganizationReports() {
             </div>
           </div>
         </div>
-      </>
+      </OrgLayout>
     );
   }
 
   return (
-    <>
+    <OrgLayout>
       <Head>
         <title>Reports - Organization Dashboard</title>
         <meta name="description" content="View comprehensive reports on volunteer activities and completed opportunities" />
@@ -128,9 +241,20 @@ export default function OrganizationReports() {
           
           <div className="flex flex-col sm:flex-row gap-3">
             <select
+              value={reportType}
+              onChange={(e) => setReportType(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+            >
+              <option value="overview">Overview Report</option>
+              <option value="volunteer">Volunteer Performance</option>
+              <option value="opportunity">Opportunity Analysis</option>
+              <option value="impact">Impact Measurement</option>
+            </select>
+
+            <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
             >
               <option value="7">Last 7 days</option>
               <option value="30">Last 30 days</option>
@@ -140,18 +264,25 @@ export default function OrganizationReports() {
             
             <div className="flex gap-2">
               <button
-                onClick={() => exportReport('json')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                onClick={() => exportReport('pdf')}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
               >
                 <DocumentArrowDownIcon className="w-4 h-4" />
-                Export JSON
+                PDF
               </button>
               <button
                 onClick={() => exportReport('csv')}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
               >
                 <DocumentArrowDownIcon className="w-4 h-4" />
-                Export CSV
+                CSV
+              </button>
+              <button
+                onClick={() => exportReport('excel')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <DocumentArrowDownIcon className="w-4 h-4" />
+                Excel
               </button>
             </div>
           </div>
@@ -332,7 +463,7 @@ export default function OrganizationReports() {
           )}
         </div>
       </div>
-    </>
+    </OrgLayout>
   );
 }
 

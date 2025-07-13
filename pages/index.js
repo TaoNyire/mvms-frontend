@@ -28,68 +28,70 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch featured opportunities (public endpoint)
-        const opportunitiesRes = await axios.get(`${API_BASE}/opportunities/public`);
-        const opportunitiesData = opportunitiesRes.data?.data || opportunitiesRes.data || [];
+        // Try to fetch featured opportunities (public endpoint)
+        let opportunitiesData = [];
+        try {
+          console.log('Fetching opportunities from:', `${API_BASE}/opportunities/public`);
+          const opportunitiesRes = await axios.get(`${API_BASE}/opportunities/public`);
+          opportunitiesData = opportunitiesRes.data?.data || opportunitiesRes.data || [];
+          console.log('Opportunities fetched successfully:', opportunitiesData.length);
+        } catch (oppError) {
+          console.log('Failed to fetch opportunities:', oppError.response?.status, oppError.response?.data);
+
+          // Try alternative public endpoint
+          try {
+            const altOpportunitiesRes = await axios.get(`${API_BASE}/public/opportunities`);
+            opportunitiesData = altOpportunitiesRes.data?.data || altOpportunitiesRes.data || [];
+            console.log('Alternative opportunities endpoint worked:', opportunitiesData.length);
+          } catch (altError) {
+            console.log('Alternative opportunities endpoint also failed:', altError.response?.status);
+            opportunitiesData = [];
+          }
+        }
 
         // Take only first 3 for featured section
         setOpportunities(opportunitiesData.slice(0, 3));
 
-        // Fetch statistics
-        const statsRes = await axios.get(`${API_BASE}/stats/public`);
-        if (statsRes.data) {
+        // Try to fetch statistics
+        let statsData = null;
+        try {
+          console.log('Fetching stats from:', `${API_BASE}/stats/public`);
+          const statsRes = await axios.get(`${API_BASE}/stats/public`);
+          statsData = statsRes.data;
+          console.log('Stats fetched successfully:', statsData);
+        } catch (statsError) {
+          console.log('Failed to fetch stats:', statsError.response?.status, statsError.response?.data);
+          statsData = null;
+        }
+
+        if (statsData) {
           setStats({
-            volunteers: statsRes.data.volunteers || 0,
-            organizations: statsRes.data.organizations || 0,
-            totalOpportunities: statsRes.data.opportunities || opportunitiesData.length
+            volunteers: statsData.volunteers || 0,
+            organizations: statsData.organizations || 0,
+            totalOpportunities: statsData.opportunities || opportunitiesData.length
           });
         } else {
-          // Fallback: calculate from available data
+          // Fallback: use reasonable default values
           setStats({
-            volunteers: 500, // Default fallback
-            organizations: 150, // Default fallback
-            totalOpportunities: opportunitiesData.length
+            volunteers: 250, // Default fallback
+            organizations: 75, // Default fallback
+            totalOpportunities: opportunitiesData.length || 5
           });
         }
+
+        console.log('Home page data loaded successfully');
+
       } catch (error) {
-        console.error('Error fetching data:', error);
-        console.error('Error details:', {
-          status: error.response?.status,
-          message: error.message,
-          data: error.response?.data
-        });
+        console.error('Unexpected error in home page data fetch:', error);
 
-        // Set fallback data on error
+        // Set fallback data on any unexpected error
         setStats({
-          volunteers: 500,
-          organizations: 150,
-          totalOpportunities: 3
+          volunteers: 250,
+          organizations: 75,
+          totalOpportunities: 5
         });
 
-        // Set sample opportunities for demonstration
-        setOpportunities([
-          {
-            id: 1,
-            title: "Community Garden Project",
-            description: "Help establish and maintain a community garden to provide fresh produce for local families.",
-            location: "Downtown Community Center",
-            category: "Environment"
-          },
-          {
-            id: 2,
-            title: "Youth Education Support",
-            description: "Assist with after-school tutoring and mentoring programs for underprivileged children.",
-            location: "Lilongwe Primary School",
-            category: "Education"
-          },
-          {
-            id: 3,
-            title: "Healthcare Outreach Program",
-            description: "Support mobile health clinics in rural areas with patient registration and health education.",
-            location: "Rural Blantyre District",
-            category: "Healthcare"
-          }
-        ]);
+        setOpportunities([]);
       } finally {
         setLoading(false);
       }
@@ -147,7 +149,7 @@ export default function Home() {
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
                 <Link href="/register" className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
-                  Start Volunteering
+                  Create Account
                 </Link>
                 <Link href="#opportunities" className="bg-white hover:bg-gray-50 text-green-600 border-2 border-green-600 px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
                   View Opportunities

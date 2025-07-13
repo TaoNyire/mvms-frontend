@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import axios from "axios";
 import {
   HomeIcon,
   BriefcaseIcon,
@@ -12,8 +13,11 @@ import {
   Bars3Icon,
   XMarkIcon,
   AcademicCapIcon,
+  ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../context/AuthContext";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 // Sidebar links for volunteers, matching UNV style and including a dashboard link
 const sidebarLinks = [
@@ -31,6 +35,11 @@ const sidebarLinks = [
     href: "/volunteer/applications",
     label: "Applications",
     icon: <DocumentTextIcon className="w-6 h-6" />,
+  },
+  {
+    href: "/volunteer/tasks",
+    label: "My Tasks",
+    icon: <ClipboardDocumentListIcon className="w-6 h-6" />,
   },
   {
     href: "/volunteer/skills",
@@ -61,8 +70,9 @@ const sidebarLinks = [
 
 export default function VolunteerSidebar() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen);

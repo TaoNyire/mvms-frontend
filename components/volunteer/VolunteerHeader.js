@@ -30,18 +30,68 @@ export default function VolunteerHeader() {
 
     const fetchNotificationCount = async () => {
       try {
-        const response = await axios.get(`${API_BASE}/my-notifications`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        console.log('Fetching notifications with token:', token ? 'Token exists' : 'No token');
+        console.log('API_BASE:', API_BASE);
 
-        const notificationsData = response.data.data || [];
-        const unreadNotifications = notificationsData.filter(n => !n.read);
-        setUnreadCount(unreadNotifications.length);
+        // First, test if API is reachable with a simple health check
+        try {
+          await axios.get(`${API_BASE}/test-messages`, { timeout: 3000 });
+          console.log('API health check passed');
+        } catch (healthError) {
+          console.error('API health check failed:', healthError.message);
+          throw new Error('API server is not reachable');
+        }
+
+        // Test authentication first
+        try {
+          const authTest = await axios.get(`${API_BASE}/test-auth`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          console.log('Authentication test passed:', authTest.data);
+        } catch (authError) {
+          console.error('Authentication test failed:', authError.response?.data);
+          throw new Error('Authentication failed');
+        }
+
+        // Try the simpler notification count endpoint first
+        let response;
+        try {
+          response = await axios.get(`${API_BASE}/my-notifications/count`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          console.log('Notification count response:', response.data);
+          setUnreadCount(response.data.unread_count || 0);
+        } catch (countError) {
+          console.log('Count endpoint failed, trying full notifications endpoint');
+          // Fallback to full notifications endpoint
+          response = await axios.get(`${API_BASE}/my-notifications`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          console.log('Notifications response:', response.data);
+          const notificationsData = response.data.data || [];
+          const unreadNotifications = notificationsData.filter(n => !n.read);
+          setUnreadCount(unreadNotifications.length);
+        }
 
       } catch (error) {
         console.error('Error fetching notification count:', error);
-        // Use sample count if API fails
-        setUnreadCount(2);
+        console.error('Error details:', {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data
+        });
+
+        // Check if it's an authentication error
+        if (error.response?.status === 401) {
+          console.warn('Authentication failed - token may be invalid or expired');
+          // You might want to redirect to login or refresh token here
+        } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+          console.warn('Network error - API server may be down');
+        }
+
+        // Use sample count if API fails (set to 0 to avoid confusion)
+        setUnreadCount(0);
       }
     };
 

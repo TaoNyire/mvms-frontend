@@ -81,11 +81,10 @@ export default function OrgProfilePage() {
   const orgTypeOptions = [
     "NGO",
     "CBO",
-    "Faith-based Organization",
-    "Government Agency",
-    "Private Company",
-    "International Organization",
-    "Academic Institution",
+    "Government",
+    "Faith-based",
+    "Educational",
+    "Private",
   ];
 
   // Ensure only Organizations can access
@@ -181,10 +180,10 @@ export default function OrgProfilePage() {
     try {
       const profileData = {
         ...profile,
-        focus_areas: profile.focus_areas.split(',').map(area => area.trim()).filter(area => area)
+        focus_areas: profile.focus_areas // Keep as string since backend expects string
       };
 
-      const res = await axios.put(`${API_BASE}/organization/profile`, profileData, {
+      const res = await axios.post(`${API_BASE}/organization/profile`, profileData, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -441,6 +440,7 @@ export default function OrgProfilePage() {
             </button>
           </div>
         </div>
+      </div>
     </>
   );
 }

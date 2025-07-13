@@ -33,6 +33,11 @@ export default function ApplicationsIndex() {
     accepted: 0,
     rejected: 0
   });
+  const [selectedApplications, setSelectedApplications] = useState([]);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [showScoringModal, setShowScoringModal] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState(null);
+  const [sortBy, setSortBy] = useState('date'); // 'date', 'score', 'match'
 
   // Fetch applications
   useEffect(() => {
@@ -125,6 +130,105 @@ export default function ApplicationsIndex() {
     }
   };
 
+  // Batch processing functions
+  const toggleApplicationSelection = (applicationId) => {
+    setSelectedApplications(prev =>
+      prev.includes(applicationId)
+        ? prev.filter(id => id !== applicationId)
+        : [...prev, applicationId]
+    );
+  };
+
+  const selectAllApplications = () => {
+    const pendingApps = filteredApplications.filter(app => app.status?.toLowerCase() === 'pending').map(app => app.id);
+    setSelectedApplications(pendingApps);
+  };
+
+  const clearSelection = () => {
+    setSelectedApplications([]);
+  };
+
+  const batchProcessApplications = async (action, rejectionReason = '') => {
+    try {
+      const promises = selectedApplications.map(appId =>
+        axios.put(`${API_BASE}/applications/${appId}/status`,
+          {
+            status: action,
+            rejection_reason: rejectionReason
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+      );
+
+      await Promise.all(promises);
+
+      // Refresh applications
+      const response = await axios.get(`${API_BASE}/applications`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setApplications(response.data.data || response.data || []);
+
+      alert(`Successfully ${action} ${selectedApplications.length} applications!`);
+      setSelectedApplications([]);
+      setShowBatchModal(false);
+
+    } catch (error) {
+      console.error("Failed to batch process applications:", error);
+      alert("Failed to process some applications. Please try again.");
+    }
+  };
+
+  // Application scoring function
+  const calculateApplicationScore = (application) => {
+    let score = 0;
+    const opportunity = application.opportunity;
+    const volunteer = application.volunteer;
+
+    if (!opportunity || !volunteer) return 0;
+
+    // Skills match (40% of score)
+    const requiredSkills = opportunity.required_skills || [];
+    const volunteerSkills = volunteer.skills || [];
+    const skillsMatch = requiredSkills.filter(skill =>
+      volunteerSkills.some(vSkill => vSkill.toLowerCase().includes(skill.toLowerCase()))
+    ).length;
+    const skillsScore = requiredSkills.length > 0 ? (skillsMatch / requiredSkills.length) * 40 : 20;
+    score += skillsScore;
+
+    // Experience level (30% of score)
+    const experienceScore = volunteer.experience_level === 'expert' ? 30 :
+                           volunteer.experience_level === 'intermediate' ? 20 : 10;
+    score += experienceScore;
+
+    // Availability (20% of score)
+    const availabilityScore = volunteer.availability === 'full-time' ? 20 :
+                             volunteer.availability === 'part-time' ? 15 : 10;
+    score += availabilityScore;
+
+    // Application completeness (10% of score)
+    const completenessScore = (application.cover_letter ? 5 : 0) +
+                             (volunteer.phone ? 2.5 : 0) +
+                             (volunteer.address ? 2.5 : 0);
+    score += completenessScore;
+
+    return Math.round(score);
+  };
+
+  // Sort applications
+  const sortedApplications = [...filteredApplications].sort((a, b) => {
+    switch (sortBy) {
+      case 'score':
+        return calculateApplicationScore(b) - calculateApplicationScore(a);
+      case 'match':
+        const aMatch = calculateApplicationScore(a);
+        const bMatch = calculateApplicationScore(b);
+        return bMatch - aMatch;
+      case 'date':
+      default:
+        return new Date(b.created_at || b.application_date) - new Date(a.created_at || a.application_date);
+    }
+  });
+
   return (
     <>
       <Head>
@@ -204,7 +308,7 @@ export default function ApplicationsIndex() {
                   placeholder="Search by volunteer name, opportunity, or email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900"
                 />
               </div>
             </div>
@@ -215,7 +319,7 @@ export default function ApplicationsIndex() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900"
               >
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
@@ -367,6 +471,28 @@ function ApplicationCard({ application, onQuickAction, actionLoading }) {
             <EyeIcon className="w-4 h-4" />
             View Details
           </Link>
+
+          {/* CV Download Button */}
+          {application.volunteer?.volunteer_profile?.cv_url ? (
+            <a
+              href={application.volunteer.volunteer_profile.cv_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Download CV
+            </a>
+          ) : (
+            <div className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              No CV
+            </div>
+          )}
 
           {application.status?.toLowerCase() === 'pending' && (
             <div className="flex gap-2">

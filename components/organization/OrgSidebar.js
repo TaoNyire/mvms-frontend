@@ -1,16 +1,21 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useAuth } from "../../context/AuthContext";
-import { Briefcase, LayoutDashboard, MessageSquare, ClipboardList, Settings, Users, Star, ChartBar } from "lucide-react";
+import { Briefcase, LayoutDashboard, MessageSquare, ClipboardList, Settings, Users, Star, ChartBar, CheckSquare, UserCheck } from "lucide-react";
+import { BookOpen, Cog } from "lucide-react";
 
 const menuItems = [
   { name: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, path: "/organization/dashboard" },
   { name: "Opportunities", icon: <Briefcase className="w-5 h-5" />, path: "/organization/opportunities" },
-  { name: "Tasks", icon: <ClipboardList className="w-5 h-5" />, path: "/organization/tasks" },
+  { name: "Skills", icon: <BookOpen className="w-5 h-5" />, path: "/organization/skills" },
+ 
+  { name: "Task Management", icon: <Cog className="w-5 h-5" />, path: "/organization/task-management" },
+  { name: "Applications", icon: <ClipboardList className="w-5 h-5" />, path: "/organization/applications" },
+  { name: "Tasks", icon: <CheckSquare className="w-5 h-5" />, path: "/organization/tasks" },
+  { name: "Assignments", icon: <UserCheck className="w-5 h-5" />, path: "/organization/assignments" },
   { name: "Volunteers", icon: <Users className="w-5 h-5" />, path: "/organization/volunteers" },
   { name: "Messages", icon: <MessageSquare className="w-5 h-5" />, path: "/organization/messages" },
   { name: "Feedback", icon: <Star className="w-5 h-5" />, path: "/organization/feedback" },
-  { name: "Reports", icon: <ChartBar className="w-5 h-5" />, path: "/organization/reports" },
   { name: "Profile", icon: <Settings className="w-5 h-5" />, path: "/organization/profile" },
 ];
 

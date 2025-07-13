@@ -51,11 +51,17 @@ export default function ProfilePage() {
     region: "",
     district: "",
     availability: "",
+    cv: null,
+    cv_original_name: null,
+    cv_url: null,
   });
   const [completion, setCompletion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [cvFile, setCvFile] = useState(null);
+  const [uploadingCv, setUploadingCv] = useState(false);
+  const [deletingCv, setDeletingCv] = useState(false);
 
   const availabilityOptions = [
     "Full-time",
@@ -141,6 +147,100 @@ export default function ProfilePage() {
     }
   };
 
+  // Handle CV file selection
+  const handleCvFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Please select a PDF, DOC, or DOCX file.');
+        return;
+      }
+
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB.');
+        return;
+      }
+
+      setCvFile(file);
+    }
+  };
+
+  // Upload CV
+  const handleCvUpload = async () => {
+    if (!cvFile) return;
+
+    setUploadingCv(true);
+    setError("");
+
+    try {
+      const formData = new FormData();
+      formData.append('cv', cvFile);
+
+      const response = await axios.post(
+        `${API_BASE}/volunteer/profile/cv`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      // Update profile with new CV info
+      setProfile(prev => ({
+        ...prev,
+        cv_url: response.data.cv_url,
+        cv_original_name: response.data.cv_original_name
+      }));
+
+      setCvFile(null);
+      // Reset file input
+      const fileInput = document.getElementById('cv-upload');
+      if (fileInput) fileInput.value = '';
+
+      alert('CV uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading CV:', error);
+      setError(error.response?.data?.message || 'Failed to upload CV. Please try again.');
+    } finally {
+      setUploadingCv(false);
+    }
+  };
+
+  // Delete CV
+  const handleCvDelete = async () => {
+    if (!confirm('Are you sure you want to delete your CV? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingCv(true);
+    setError("");
+
+    try {
+      await axios.delete(`${API_BASE}/volunteer/profile/cv`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Update profile to remove CV info
+      setProfile(prev => ({
+        ...prev,
+        cv_url: null,
+        cv_original_name: null
+      }));
+
+      alert('CV deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting CV:', error);
+      setError(error.response?.data?.message || 'Failed to delete CV. Please try again.');
+    } finally {
+      setDeletingCv(false);
+    }
+  };
+
   function calculateCompletion(data) {
     if (!data) return 0;
     const fields = ["bio", "location", "region", "district", "availability"];
@@ -190,6 +290,22 @@ export default function ProfilePage() {
             </p>
           )}
         </div>
+
+        {/* CV Requirement Notice */}
+        {!profile.cv_url && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg mb-6">
+            <div className="flex items-start gap-3">
+              <DocumentTextIcon className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-medium text-amber-900 mb-1">CV Upload Required</h3>
+                <p className="text-sm text-amber-800">
+                  You must upload your CV before you can apply for volunteer opportunities.
+                  This helps organizations understand your background and match you with suitable positions.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
@@ -293,6 +409,103 @@ export default function ProfilePage() {
                   </option>
                 ))}
               </Select>
+            </div>
+
+            {/* CV Upload Section */}
+            <div className="mt-8 p-6 bg-gray-50 rounded-lg border">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">📄 CV/Resume</h3>
+
+              {profile.cv_url ? (
+                // CV exists - show current CV and options
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-white rounded-lg border">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <span className="text-blue-600 font-semibold">📄</span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {profile.cv_original_name || 'CV.pdf'}
+                        </p>
+                        <p className="text-sm text-gray-500">Current CV</p>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <a
+                        href={profile.cv_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        View
+                      </a>
+                      <button
+                        onClick={handleCvDelete}
+                        disabled={deletingCv}
+                        className="px-3 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:opacity-50"
+                      >
+                        {deletingCv ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Replace CV option */}
+                  <div className="border-t pt-4">
+                    <p className="text-sm text-gray-600 mb-3">Upload a new CV to replace the current one:</p>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="file"
+                        id="cv-upload"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleCvFileChange}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                      {cvFile && (
+                        <button
+                          onClick={handleCvUpload}
+                          disabled={uploadingCv}
+                          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+                        >
+                          {uploadingCv ? 'Uploading...' : 'Replace CV'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // No CV - show upload option
+                <div className="text-center py-6">
+                  <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <span className="text-gray-400 text-2xl">📄</span>
+                  </div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">No CV uploaded</h4>
+                  <p className="text-gray-600 mb-4">Upload your CV to help organizations learn more about your background and qualifications.</p>
+
+                  <div className="max-w-md mx-auto">
+                    <input
+                      type="file"
+                      id="cv-upload"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleCvFileChange}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-3"
+                    />
+                    {cvFile && (
+                      <button
+                        onClick={handleCvUpload}
+                        disabled={uploadingCv}
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+                      >
+                        {uploadingCv ? 'Uploading...' : 'Upload CV'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="mt-4 text-xs text-gray-500">
+                    <p>Supported formats: PDF, DOC, DOCX</p>
+                    <p>Maximum file size: 5MB</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <button

@@ -20,6 +20,7 @@ export default function Applications() {
   const [apiLoading, setApiLoading] = useState(true);
   const [apiError, setApiError] = useState("");
   const [filter, setFilter] = useState("all");
+  const [withdrawingId, setWithdrawingId] = useState(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -78,6 +79,28 @@ export default function Applications() {
     }
   };
 
+  const handleWithdraw = async (applicationId) => {
+    if (!confirm("Are you sure you want to withdraw this application? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setWithdrawingId(applicationId);
+      await axios.delete(`${API_BASE}/applications/${applicationId}/withdraw`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Remove the application from the list
+      setApplications(prev => prev.filter(app => app.id !== applicationId));
+      alert("Application withdrawn successfully!");
+    } catch (error) {
+      console.error("Error withdrawing application:", error);
+      alert(error.response?.data?.message || "Failed to withdraw application. Please try again.");
+    } finally {
+      setWithdrawingId(null);
+    }
+  };
+
   // Filter applications
   const filteredApplications = applications.filter(app => {
     if (filter === "all") return true;
@@ -132,7 +155,24 @@ export default function Applications() {
         )}
 
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <h1 className="text-xl sm:text-2xl font-bold text-green-700">My Applications</h1>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-green-700">My Applications</h1>
+            <p className="text-gray-600 text-sm mt-1">
+              {(() => {
+                const activeCount = applications.filter(app =>
+                  app.status?.toLowerCase() === 'pending' || app.status?.toLowerCase() === 'accepted'
+                ).length;
+                return (
+                  <>
+                    {activeCount}/2 active applications
+                    {activeCount >= 2 && (
+                      <span className="text-red-600 font-medium"> (Limit reached)</span>
+                    )}
+                  </>
+                );
+              })()}
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
             {['all', 'pending', 'accepted', 'rejected'].map((status) => (
               <button
@@ -149,6 +189,42 @@ export default function Applications() {
             ))}
           </div>
         </div>
+
+        {/* Application Limit Warning */}
+        {(() => {
+          const activeApplications = applications.filter(app =>
+            app.status?.toLowerCase() === 'pending' || app.status?.toLowerCase() === 'accepted'
+          );
+          const activeCount = activeApplications.length;
+
+          if (activeCount >= 2) {
+            return (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="font-medium">Application limit reached (2/2)</span>
+                </div>
+                <p className="text-sm mt-1">
+                  You have reached the maximum number of active applications. To apply for new opportunities,
+                  please withdraw from a pending application or wait for a response.
+                </p>
+              </div>
+            );
+          } else if (activeCount === 1) {
+            return (
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <span className="font-medium">1 application slot remaining</span>
+                </div>
+                <p className="text-sm mt-1">
+                  You can apply to 1 more opportunity. Choose wisely!
+                </p>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {filteredApplications.length === 0 ? (
           <div className="text-center py-8 sm:py-12">
@@ -206,12 +282,23 @@ export default function Applications() {
                       <span>📍 {app.opportunity.location}</span>
                     )}
                   </div>
-                  <button
-                    onClick={() => router.push(`/volunteer/applications/${app.id}`)}
-                    className="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs sm:text-sm"
-                  >
-                    View Details
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={() => router.push(`/volunteer/applications/${app.id}`)}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs sm:text-sm"
+                    >
+                      View Details
+                    </button>
+                    {app.status?.toLowerCase() === 'pending' && (
+                      <button
+                        onClick={() => handleWithdraw(app.id)}
+                        disabled={withdrawingId === app.id}
+                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {withdrawingId === app.id ? 'Withdrawing...' : 'Withdraw'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

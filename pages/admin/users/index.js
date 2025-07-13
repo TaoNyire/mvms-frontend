@@ -13,6 +13,7 @@ export default function AdminUsers() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
 
   // Modal state
@@ -45,7 +46,10 @@ export default function AdminUsers() {
         },
       })
       .then((res) => {
-        setUsers(res.data.data || res.data.users || []);
+        const userData = res.data.data || res.data.users || [];
+        console.log("User data received:", userData);
+        console.log("First user roles:", userData[0]?.roles);
+        setUsers(userData);
       })
       .catch(() => setApiError("Failed to fetch users."))
       .finally(() => setLoading(false));
@@ -66,8 +70,13 @@ export default function AdminUsers() {
           )
         );
         setConfirmAction(null);
+        setSuccessMessage(`User ${user.active ? 'deactivated' : 'activated'} successfully`);
+        setTimeout(() => setSuccessMessage(""), 3000);
       })
-      .catch(() => alert("Failed to toggle user status."))
+      .catch(() => {
+        setApiError("Failed to toggle user status.");
+        setTimeout(() => setApiError(""), 3000);
+      })
       .finally(() => setActionLoading(false));
   };
 
@@ -80,8 +89,13 @@ export default function AdminUsers() {
       .then(() => {
         setUsers((prev) => prev.filter((u) => u.id !== user.id));
         setConfirmAction(null);
+        setSuccessMessage(`User "${user.name}" deleted successfully`);
+        setTimeout(() => setSuccessMessage(""), 3000);
       })
-      .catch(() => alert("Failed to delete user."))
+      .catch(() => {
+        setApiError("Failed to delete user.");
+        setTimeout(() => setApiError(""), 3000);
+      })
       .finally(() => setActionLoading(false));
   };
 
@@ -94,14 +108,18 @@ export default function AdminUsers() {
         { headers: { Authorization: `Bearer ${token}` } }
       )
       .then((res) => {
-        alert(
+        setConfirmAction(null);
+        setSuccessMessage(
           res.data.new_password
-            ? `Password reset. New password: ${res.data.new_password}`
+            ? `Password reset for ${user.name}. New password: ${res.data.new_password}`
             : "Password reset email sent."
         );
-        setConfirmAction(null);
+        setTimeout(() => setSuccessMessage(""), 8000); // Longer timeout for password display
       })
-      .catch(() => alert("Failed to reset password."))
+      .catch(() => {
+        setApiError("Failed to reset password.");
+        setTimeout(() => setApiError(""), 3000);
+      })
       .finally(() => setActionLoading(false));
   };
 
@@ -213,6 +231,11 @@ export default function AdminUsers() {
             <option value="inactive">Inactive</option>
           </select>
         </div>
+        {successMessage && (
+          <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+            {successMessage}
+          </div>
+        )}
         {apiError && (
           <div className="text-red-600 font-semibold mb-4">{apiError}</div>
         )}
@@ -252,13 +275,39 @@ export default function AdminUsers() {
                     <td className="px-4 py-2 text-gray-900">{user.name}</td>
                     <td className="px-4 py-2 text-gray-700">{user.email}</td>
                     <td className="px-4 py-2">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                        user.role === 'organization' ? 'bg-blue-100 text-blue-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Volunteer'}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {user.roles && user.roles.length > 0 ? (
+                          user.roles.map((role, index) => {
+                            const roleName = typeof role === 'string' ? role : role.name;
+                            return (
+                              <span
+                                key={index}
+                                className={`px-2 py-1 rounded text-xs font-semibold ${
+                                  roleName === 'admin' ? 'bg-purple-100 text-purple-800' :
+                                  roleName === 'organization' ? 'bg-blue-100 text-blue-800' :
+                                  roleName === 'volunteer' ? 'bg-green-100 text-green-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {roleName ? roleName.charAt(0).toUpperCase() + roleName.slice(1) : 'Unknown'}
+                              </span>
+                            );
+                          })
+                        ) : user.role ? (
+                          // Fallback to single role if roles array is not available
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                            user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                            user.role === 'organization' ? 'bg-blue-100 text-blue-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-600">
+                            No Role
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-2">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${
@@ -269,37 +318,48 @@ export default function AdminUsers() {
                         {user.active ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td className="px-4 py-2 space-x-2 flex flex-col sm:flex-row">
-                      <button
-                        className="text-indigo-600 hover:underline text-xs"
-                        onClick={() => window.open(`/admin/users/${user.id}`, "_blank")}
-                      >
-                        View
-                      </button>
-                      <button
-                        className="text-green-700 hover:underline text-xs"
-                        onClick={() => setEditUser(user)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="text-yellow-700 hover:underline text-xs"
-                        onClick={() => setConfirmAction({ type: "toggle", user })}
-                      >
-                        {user.active ? "Deactivate" : "Activate"}
-                      </button>
-                      <button
-                        className="text-blue-700 hover:underline text-xs"
-                        onClick={() => setConfirmAction({ type: "reset", user })}
-                      >
-                        Reset Password
-                      </button>
-                      <button
-                        className="text-red-600 hover:underline text-xs"
-                        onClick={() => setConfirmAction({ type: "delete", user })}
-                      >
-                        Delete
-                      </button>
+                    <td className="px-4 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors"
+                          onClick={() => window.open(`/admin/users/${user.id}`, "_blank")}
+                          title="View user details"
+                        >
+                          👁️ View
+                        </button>
+                        <button
+                          className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                          onClick={() => setEditUser(user)}
+                          title="Edit user information"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          className={`px-2 py-1 text-xs rounded transition-colors ${
+                            user.active
+                              ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                              : "bg-green-100 text-green-700 hover:bg-green-200"
+                          }`}
+                          onClick={() => setConfirmAction({ type: "toggle", user })}
+                          title={user.active ? "Deactivate user" : "Activate user"}
+                        >
+                          {user.active ? "🔒 Deactivate" : "🔓 Activate"}
+                        </button>
+                        <button
+                          className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                          onClick={() => setConfirmAction({ type: "reset", user })}
+                          title="Reset user password"
+                        >
+                          🔑 Reset
+                        </button>
+                        <button
+                          className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                          onClick={() => setConfirmAction({ type: "delete", user })}
+                          title="Delete user"
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
